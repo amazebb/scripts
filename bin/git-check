@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+
+# Check Git respository status
+
+# Version
+VERSION="1.0.0"
+
+# Help function
+usage() {
+    echo "Usage: git-check [options] [path...]"
+    echo "Options:"
+    echo "  -u            Include untracked files in change check"
+    echo "  -v            Verbose: show git status for changed repos"
+    echo "  -h, --help    Show this help message"
+    echo "  --version     Show version information"
+    echo "Arguments:"
+    echo "  path...   Path to check"
+    exit 0
+}
+
+# Version function
+version() {
+    echo "$VERSION"
+    exit 0
+}
+
+untracked=no
+verbose=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+    -h | --help) usage ;;
+    --version) version ;;
+    --)
+        shift
+        break
+        ;;
+    -u) untracked=normal ;;
+    -v) verbose=true ;;
+    -*)
+        echo "Unknown option: $1" >&2
+        usage
+        ;;
+    *) break ;; # Non-option args (positionals)
+    esac
+    shift
+done
+
+# De-duplicate and validate input directories
+declare -a unique_dirs=()
+declare -A seen_dirs=()
+for dir in "$@"; do
+    if [ ! -d "$dir" ]; then
+        echo "Error: '$dir' is not a directory" >&2
+        continue
+    fi
+    if [[ -z ${seen_dirs[$dir]} ]]; then
+        seen_dirs[$dir]=1
+        unique_dirs+=("$dir")
+    fi
+done
+
+# Main script logic here
+echo "Script running with the following inputs:"
+echo "path: $*"
+
+max_len=0
+declare -a repos=()
+while IFS= read -r repodir; do
+    if [ -z "$repodir" ]; then continue; fi
+    len=${#repodir}
+    if ((len > max_len)); then max_len=$len; fi
+    repos+=("$repodir")
+done < <(fd -H -t d '^\.git$' "${unique_dirs[@]}" | while IFS= read -r gitdir; do dirname "$gitdir"; done | sort -u)
+
+changed=0
+ok=0
+for repodir in "${repos[@]}"; do
+    if [ -n "$(git -C "$repodir" status --porcelain --untracked-files=$untracked)" ]; then
+        status=$'\033[31mX\033[0m'
+        ((changed++))
+        if [[ $verbose = true ]]; then
+            echo -e "\nStatus for $repodir:"
+            git -C "$repodir" status
+        fi
+    else
+        status="OK"
+        ((ok++))
+    fi
+    printf "%-${max_len}s  %s\n" "$repodir" "$status"
+done
+
+echo "$changed repos have changes, $ok are OK"

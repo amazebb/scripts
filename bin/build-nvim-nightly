@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+# Pull latest neovim commit and build
+
+# Version
+VERSION="1.0.0"
+
+# Help function
+usage() {
+    echo "build-nvim-nightly - Pull latest neovim commit and build"
+    echo
+    echo "Usage: build-nvim-nightly [options]"
+    echo
+    echo "Options:"
+    echo "  -h, --help    Show this help message"
+    echo "  --version     Show version information"
+    echo "  -r  <value>   Local neovim repo (default: $HOME/Code/GitHub/neovim)"
+    echo "  -d  <value>   Install folder for nvim-nightly build (default: $HOME/.nvim-nightly)"
+    exit 0
+}
+
+# Version function
+version() {
+    echo "$VERSION"
+    exit 0
+}
+
+REPO="$HOME/Code/GitHub/neovim"
+NVIM_NIGHTLY="$HOME/.nvim-nightly"
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+    -h | --help) usage ;;
+    --version) version ;;
+    --)
+        shift
+        break
+        ;;
+    -r)
+        if [[ $# -lt 2 ]]; then
+            echo "Error: -r requires an argument" >&2
+            usage
+        fi
+        REPO="$2"
+        shift
+        ;;
+    -d)
+        if [[ $# -lt 2 ]]; then
+            echo "Error: -d requires an argument" >&2
+            usage
+        fi
+        NVIM_NIGHTLY="$2"
+        shift
+        ;;
+    -*)
+        echo "Unknown option: $1" >&2
+        usage
+        ;;
+    *) break ;; # Non-option args (positionals)
+    esac
+    shift
+done
+
+echo "build-nvim-nightly running with the following:"
+echo
+echo "-r:$REPO (Local neovim repo)"
+echo "-d:$NVIM_NIGHTLY (Install folder for nvim-nightly build)"
+
+cd "$REPO" || exit
+git pull
+rm -rf build
+make CMAKE_BUILD_TYPE=Release CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$NVIM_NIGHTLY"
+make install

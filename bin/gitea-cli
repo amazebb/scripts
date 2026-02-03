@@ -1,0 +1,85 @@
+#!/usr/bin/env dash
+# Manage Gitea: start, stop, status, logs.
+
+# Help message
+show_help() {
+    script_name=$(basename "$0")
+    echo "Usage: $script_name [OPTION]"
+    echo "Manage Gitea server operations."
+    echo
+    echo "Options:"
+    echo "  start       Start the Gitea server"
+    echo "  stop        Stop the Gitea server"
+    echo "  status      Show the Gitea running status"
+    echo "  log         Show Gitea server logs"
+    echo "  -h, --help  Display this help message"
+}
+
+start_gitea() {
+    # printf "\033]0;Gitea\007"  # Set tab title to "Gitea"
+    if pgrep -f "gitea web" >/dev/null; then
+        echo "Gitea is already running."
+    else
+        gitea web --config ~/.gitea-data/custom/conf/app.ini & # Start Gitea in background
+        # GITEA_PID=$!  # Capture PID
+        until curl -s http://localhost:3000 >/dev/null; do # Wait until Gitea responds
+            sleep 1
+        done
+        echo "Gitea started."
+    fi
+    open -a Safari http://localhost:3000 # Open Safari regardless
+    # wait $GITEA_PID 2>/dev/null || true  # Wait on PID if started, ignore if not
+}
+
+stop_gitea() {
+    if pgrep -f "gitea web" >/dev/null; then
+        echo "Stopping Gitea..."
+        pkill -INT -f "gitea web"
+        echo "Gitea stopped"
+    else
+        echo "Gitea not running"
+    fi
+}
+
+show_logs() {
+    echo "Showing Gitea logs..."
+    tail -f ~/.gitea-data/log/gitea.log | bat --paging=never -l log
+}
+
+status_gitea() {
+    if pgrep -f "gitea web" >/dev/null; then
+        echo "Gitea is running (PID: $(pgrep -f "gitea web"))"
+    else
+        echo "Gitea is not running"
+    fi
+}
+
+# Check if no arguments are provided
+if [ $# -eq 0 ]; then
+    show_help
+    exit 0
+fi
+
+# Process arguments
+case "$1" in
+start)
+    start_gitea
+    ;;
+stop)
+    stop_gitea
+    ;;
+status)
+    status_gitea
+    ;;
+log)
+    show_logs
+    ;;
+-h | --help | -help)
+    show_help
+    ;;
+*)
+    echo "Error: Unknown option '$1'"
+    show_help
+    exit 1
+    ;;
+esac

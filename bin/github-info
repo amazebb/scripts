@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+
+# GitHub repo information
+
+# Version
+VERSION="1.0.0"
+
+# Help function
+usage() {
+    echo "Usage: github-info"
+    echo "Options:"
+    echo "  -h           Show this help message"
+    echo "  --version    Show version information"
+    echo "Required inputs:"
+    echo "  owner   The owner of repo"
+    echo "  repo    Name of repo"
+    exit 0
+}
+
+# Version function
+version() {
+    echo "$VERSION"
+    exit 0
+}
+
+# Check if help or version is requested
+if [[ "$1" == "-h" ]]; then
+    usage
+fi
+if [[ "$1" == "--version" ]]; then
+    version
+fi
+
+# Parse optional arguments with getopts
+while getopts "h" opt; do
+    case "$opt" in
+    h) usage ;;
+    ?) usage ;;
+    esac
+done
+
+# Shift past the options
+shift $((OPTIND - 1))
+
+# Check required positional inputs
+if [[ $# -lt 1 ]]; then
+    echo "Error: Missing required positional inputs"
+    usage
+fi
+
+OWNER=$1
+REPO=$2
+
+# Add your script logic below
+echo "Size of $OWNER/$REPO"
+curl https://api.github.com/repos/"$OWNER"/"$REPO" 2>/dev/null | grep size | grep -o '[0-9]\+' | awk '{print $1/1024 " MB"}'

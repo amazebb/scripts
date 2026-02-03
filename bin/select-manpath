@@ -1,0 +1,14 @@
+#!/usr/bin/env zsh
+# Get MANPATH entries as array.
+manpath_entries=($(manpath | tr ':' '\n'))
+
+# Use fzf to select entries (multi-select with --multi)
+selected_entries=$(printf "%s\n" "${manpath_entries[@]}" | fzf --multi --prompt="Select MANPATH entries: ")
+
+# Join selected entries with ':' and set MANPATH
+if [[ -n "$selected_entries" ]]; then
+    export MANPATH=$(echo "$selected_entries" | tr '\n' ':' | sed 's/:$//')
+    echo "MANPATH set to: $MANPATH"
+else
+    echo "No entries selected, keeping default MANPATH"
+fi

@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 # Pull latest neovim commit and build
 
 # Version
@@ -28,7 +27,7 @@ version() {
 REPO="$HOME/Code/GitHub/neovim"
 NVIM_NIGHTLY="$HOME/.nvim-nightly"
 # Parse arguments
-while [[ $# -gt 0 ]]; do
+while (($#)); do
     case $1 in
     -h | --help) usage ;;
     --version) version ;;
@@ -37,7 +36,7 @@ while [[ $# -gt 0 ]]; do
         break
         ;;
     -r)
-        if [[ $# -lt 2 ]]; then
+        if (($# < 2)); then
             echo "Error: -r requires an argument" >&2
             usage
         fi
@@ -45,7 +44,7 @@ while [[ $# -gt 0 ]]; do
         shift
         ;;
     -d)
-        if [[ $# -lt 2 ]]; then
+        if (($# < 2)); then
             echo "Error: -d requires an argument" >&2
             usage
         fi
@@ -71,3 +70,4 @@ git pull
 rm -rf build
 make CMAKE_BUILD_TYPE=Release CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$NVIM_NIGHTLY"
 make install
+ln -sf "$NVIM_NIGHTLY/bin/nvim" "$HOME/.local/bin"

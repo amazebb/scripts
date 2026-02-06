@@ -1,18 +1,21 @@
 #!/usr/bin/env zsh
 # Search text interactively with ripgrep and fzf.
 VERSION="1.0.0"
+
 # Help function
 usage() {
-    echo "Usage: fz [OPTIONAL] pattern"
-    echo "Arguments:"
-    echo "  pattern   Search pattern"
-    echo "Optional:"
-    echo "  -r        ripgrep option (e.g., \"-g '*.{pdf,zsd}'\")"
-    echo "  -h        Help"
-    echo "  -v        Version"
-    echo "Examples:"
-    echo "  fz \"-g '*.pdf'\" pattern   Search for 'pattern' in PDF files"
-    echo "  fz -- -g                    Search for literal '-g'"
+cat <<EOF
+    Usage: fz [OPTIONAL] pattern
+    Arguments:
+      pattern   Search pattern
+    Optional:
+      -r        ripgrep option (e.g., \"-g '*.{pdf,zsd}'\")
+      -h        Help
+      -v        Version
+    Examples:
+      fz \"-g '*.pdf'\" pattern   Search for 'pattern' in PDF files
+      fz -- -g                    Search for literal '-g'
+EOF
     exit 0
 }
 
@@ -23,7 +26,7 @@ version() {
 }
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-PRE_RG="--pre $SCRIPT_DIR/pre-rg --pre-glob '*.{pdf}'"
+PRE_RG=(--pre $SCRIPT_DIR/pre-rg --pre-glob '*.{pdf}')
 
 # Parse optional arguments with getopts
 while getopts "hvr:" opt; do
@@ -42,29 +45,36 @@ shift $((OPTIND - 1))
     echo "Error: Missing pattern" >&2
     usage
 }
+
 PATTERN=$1
+FOLDERS=(~ ~/.local/share/scripts ~/.local/share/zsh/site-functions/dotfiles ~/.local/share/zsh-prompt)
+OPTS=(--hidden --column --line-number --no-heading --color=always --smart-case)
 
-opts=" --hidden --column --line-number --no-heading --color=always --smart-case {q} || :"
-if dotfiles rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    # In dotfiles repo or git repo
-    RELOAD="reload:dotfiles ls-files -z | xargs -0 rg $PRE_RG $opts"
-else
-    RELOAD="reload:rg $PRE_RG $opts"
-fi
+export _FZ_FOLDERS_STR="${(j:\0:)FOLDERS}"  
+export _FZ_PRE_RG_STR="${(j:\0:)PRE_RG}"
+export _FZ_OPTS_STR="${(j:\0:)OPTS}"
+export _FZ_GIT_TRACKED="true"
 
-# shellcheck disable=SC2016
-OPENER='if [[ $FZF_SELECT_COUNT -eq 0 ]]; then
-            nvim {1} +{2}     # No selection. Open the current line in Vim.
-          else
-            nvim +cw -q {+f}  # Build quickfix list for the selected items.
-          fi'
+# In your script before fzf
+rg_search() {
+    local folders=(${(s:\0:)_FZ_FOLDERS_STR})
+    local pre_rg=(${(s:\0:)_FZ_PRE_RG_STR})
+    local opts=(${(s:\0:)_FZ_OPTS_STR})
+    for d in ${folders[@]}; do
+        cd $d
+        if [[ $_FZ_GIT_TRACKED == "true" ]] && dotfiles rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            dotfiles ls-files | sed "s|^|$d/|g"  | tr '\n' '\0' | xargs -0 rg $pre_rg[@] $opts[@] "$1" || :
+        else
+            rg $pre_rg[@] $opts[@] "$1" || :
+        fi
+    done
+}
 
-# shellcheck disable=SC2034
-BAT_OPTS="--theme=TwoDark --style=full --wrap=character --color=always --highlight-line {2}"
-# shellcheck disable=SC2016
-PREVIEW='case {1} in *.pdf) ~/.local/scripts/pre-rg {1} | nl -ba -w1 -s" " | bat $BAT_OPTS ;; *) bat $BAT_OPTS {1} ;; esac'
+RELOAD="reload:$(typeset -f rg_search); rg_search {q}"
+OPENER='(( FZF_SELECT_COUNT == 0 )) && nvim {1} +{2} || nvim +cw -q {+f}'  # Build quickfix list for the selected items.
+BAT_OPTS='--theme=TwoDark --style=full --wrap=character --color=always --highlight-line {2}'
+PREVIEW='case {1} in *.pdf) ~/.local/bin/pre-rg {1} | nl -ba -w1 -s" " | bat $BAT_OPTS ;; *) bat $BAT_OPTS {1} ;; esac'
 
-# shellcheck disable=SC2016
 fzf --disabled --ansi --multi \
     --bind "start:$RELOAD" --bind "change:$RELOAD" \
     --bind "enter:become:$OPENER" \
@@ -82,3 +92,4 @@ ALT-A: Select-all, ALT-D: Deselect-all, CTRL-P: Toggle-preview' \
     --preview "$PREVIEW" \
     --preview-window '~4,+{2}+4/3,<80(up)' \
     --query "$PATTERN"
+

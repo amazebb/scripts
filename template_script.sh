@@ -2,28 +2,27 @@
 
 # Template to use for writing scripts
 
-# Version
 VERSION="1.0.0"
 
-# Help function
 usage() {
-  echo "template_script - Template script that shows some optionals and arguments"
-  echo
-  echo "Usage: template_script [options] <arg1> <arg2>"
-  echo
-  echo "Options:"
-  echo "  -h, --help    Show this help message"
-  echo "  --version     Show version information"
-  echo "  -a  <value>   Optional A (default: 1)"
-  echo "  -b  <value>   Optional B (default: true)"
-  echo
-  echo "Arguments:"
-  echo "  arg1    First required Arg"
-  echo "  arg2    Second required Arg"
+  cat <<EOF
+template_script - Template script that shows some optionals and arguments
+
+Usage: template_script [options] <arg1> <arg2>
+ 
+Options:
+  -h, --help    Show this help message
+  --version     Show version information
+  -a  <value>   Optional A (default: 1)
+  -b  <value>   Optional B (default: true)
+
+Arguments:
+  arg1    First required Arg
+  arg2    Second required Arg
+EOF
   exit 0
 }
 
-# Version function
 version() {
   echo "$VERSION"
   exit 0
@@ -67,7 +66,7 @@ done
 
 # Check required positional inputs
 if (($# < 2)); then
-  echo "Error: Missing required positional inputs"
+  printf "\033[1;31m%s\033[0m\n" "Error: Missing required positional arguments" >&2
   usage
 fi
 

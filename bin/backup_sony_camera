@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+
+VERSION="1.0.0"
+
+usage() {
+    cat <<EOF
+backup_sony_camera - Backup photos from Sony camera SD to SSD
+
+Usage: backup_sony_camera [options] 
+ 
+Options:
+  -h, --help    Show this help message
+  --version     Show version information
+  -d, --date    Optional A (default: 1)
+  -p, --photos  Optional B (default: true)
+
+Arguments:
+  arg1    First required Arg
+  arg2    Second required Arg
+EOF
+    exit 0
+}
+
+version() {
+    echo "$VERSION"
+    exit 0
+}
+
+PHOTOS="/Volumes/PHOTOS-01-T7/SD Card/DCIM/100MSDCF"
+DATE="2020-12-03"
+DEST="/Volumes/PHOTOS-01-T7"
+
+# Parse arguments
+while (($#)); do
+    case $1 in
+    -h | --help) usage ;;
+    --version) version ;;
+    --)
+        shift
+        break
+        ;;
+    -d | --date)
+        if (($# < 2)); then
+            echo "Error: -d requires an argument" >&2
+            usage
+        fi
+        DATE="$2"
+        sAhift
+        ;;
+    -p | --photo)
+        if (($# < 2)); then
+            echo "Error: -p requires an argument" >&2
+            usage
+        fi
+        PHOTOS="$2"
+        shift
+        ;;
+    -t | --dest)
+        if (($# < 2)); then
+            echo "Error: -t requires an argument" >&2
+            usage
+        fi
+        DEST="$2"
+        shift
+        ;;
+
+    -*)
+        echo "Unknown option: $1" >&2
+        usage
+        ;;
+    *) break ;; # Non-option args (positionals)
+    esac
+    shift
+done
+
+find "$PHOTOS" -type f -newermt "$DATE" -print0 |
+    xargs -0 exiftool -fast2 \
+        -printFormat '$Directory/$FileName|$DateTimeOriginal' \
+        -dateFormat '%Y/%Y-%m/%d' |
+    while IFS='|' read -r src date; do
+        [ -z "$date" ] && continue
+        destdir="$DEST/$date"
+        mkdir -p "$destdir"
+        target=$(realpath --relative-to="$destdir" "$src")
+        ln -s "$target" "$destdir/" 2>/dev/null
+    done

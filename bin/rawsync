@@ -1,34 +1,41 @@
 #!/usr/bin/env bash
 
-VERSION="1.0.0"
-
 usage() {
     cat <<EOF
-backup_camera - Backup photos from Sony camera
+$(_b NAME)
+    $(_b rawsync) - Backup photos from camera
 
-Usage: backup_camera [options] [SD] [BACKUP] SRC DEST
+$(_b SYNOPSIS)
+    $(_b "rawsync [-h] [-d | -s]") $(_u source_directory) $(_u target_directory)
  
-Options:
-  -h, --help    Show this help message
-  --version     Show version information
-  -d, --date    exiftool will process photos newer than the given date when creating symlinks, default all
-  -s, --symlink Create symlinks
- 
-Arguments:
-  SD      Camera SD card folder to backup
-  BACKUP  Where to backup SD card to
-  SRC     Source folder for symlinks to create YYYY/YYYYMMDD/
-  TARGET  Target folder for symlinks
+$(_b DESCRIPTION)
+    Copy files from the $(_u source_directory) to a backup destination $(_u target_directory)
+    The $(_b rsync) utility is used to do the copy and $(_b exiftool) to extract date 
+    information to create the symlinked folder structure.
 
-Example: backup_camera "/Volumes/SD1/DCIM" "/Volumes/PHOTOS-01-T7/SD Card"
+$(_b OPTIONS)
+    -h        Show this help message
+    -d $(_u date)   Run exiftool on files modified after $(_u date)
+    -s        Create symlinks
+ 
+$(_b EXAMPLES)
+    Backup all files from attached camera to external SSD
+
+        rawsync "/Volumes/SD1/DCIM" "/Volumes/PHOTOS-01-T7/SD Card"
+
 EOF
     exit 0
 }
 
-version() {
-    echo "$VERSION"
-    exit 0
+_u() {
+    printf "%s" "$(tput smul)$1$(tput rmul)"
 }
+
+_b() {
+    printf "%s" "$(tput bold)$1$(tput sgr0)"
+}
+
+((!$#)) && usage
 
 SRC="/Volumes/PHOTOS-01-T7/SD Card/DCIM/100MSDCF"
 TARGET="/Volumes/PHOTOS-01-T7"
@@ -38,19 +45,18 @@ NUM_PROC="1" #$(sysctl -n hw.ncpu)"
 # Parse arguments
 while (($#)); do
     case $1 in
-    -h | --help) usage ;;
-    --version) version ;;
-    --)
-        shift
-        break
-        ;;
-    -d | --date)
+    -h) usage ;;
+    -d)
         if (($# < 2)); then
             echo "Error: -d|--date requires an argument" >&2
             usage
         fi
         DATE="$2"
         shift
+        ;;
+    --)
+        shift
+        break
         ;;
     -*)
         echo "Unknown option: $1" >&2
@@ -61,7 +67,7 @@ while (($#)); do
     shift
 done
 
-SD="$1"
+SD_CARD="$1"
 shift
 BACKUP="$1"
 shift
@@ -71,7 +77,8 @@ TARGET="$1"
 shift
 
 # Copy photos from camera internal SD card to external SSD
-# rsync -avhP "$SD" "$BACKUP" 2>"/Volumes/PHOTOS-01-T7/rsync_$(date +%Y%m%dT%H%M%S).log"
+
+# rsync -avhP "$SD_CARD" "$BACKUP" 2>"/Volumes/PHOTOS-01-T7/rsync_$(date +%Y%m%dT%H%M%S).log"
 
 # shellcheck disable=SC2016
 find "$SRC" -type f -newermt "$DATE" -print0 |

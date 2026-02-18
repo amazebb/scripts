@@ -2,7 +2,7 @@
 # List scripts with descriptions in ~/.local/scripts.
 
 # Directory to search for script
-DIR=${1:-~/.local/scripts}
+DIR=${1:-~/.local/share/scripts/bin}
 
 # Find all shell script files and process them
 find "$DIR" -type f -depth 1 | sort -k1 | while read -r script; do

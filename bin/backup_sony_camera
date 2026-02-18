@@ -4,19 +4,23 @@ VERSION="1.0.0"
 
 usage() {
     cat <<EOF
-backup_sony_camera - Backup photos from Sony camera SD to SSD
+backup_camera - Backup photos from Sony camera
 
-Usage: backup_sony_camera [options] 
+Usage: backup_camera [options] [SD] [BACKUP] SRC DEST
  
 Options:
   -h, --help    Show this help message
   --version     Show version information
-  -d, --date    Optional A (default: 1)
-  -p, --photos  Optional B (default: true)
-
+  -d, --date    exiftool will process photos newer than the given date when creating symlinks, default all
+  -s, --symlink Create symlinks
+ 
 Arguments:
-  arg1    First required Arg
-  arg2    Second required Arg
+  SD      Camera SD card folder to backup
+  BACKUP  Where to backup SD card to
+  SRC     Source folder for symlinks to create YYYY/YYYYMMDD/
+  TARGET  Target folder for symlinks
+
+Example: backup_camera "/Volumes/SD1/DCIM" "/Volumes/PHOTOS-01-T7/SD Card"
 EOF
     exit 0
 }
@@ -26,9 +30,10 @@ version() {
     exit 0
 }
 
-PHOTOS="/Volumes/PHOTOS-01-T7/SD Card/DCIM/100MSDCF"
-DATE="2020-12-03"
-DEST="/Volumes/PHOTOS-01-T7"
+SRC="/Volumes/PHOTOS-01-T7/SD Card/DCIM/100MSDCF"
+TARGET="/Volumes/PHOTOS-01-T7"
+DATE="1900-01-01"
+NUM_PROC="1" #$(sysctl -n hw.ncpu)"
 
 # Parse arguments
 while (($#)); do
@@ -41,29 +46,12 @@ while (($#)); do
         ;;
     -d | --date)
         if (($# < 2)); then
-            echo "Error: -d requires an argument" >&2
+            echo "Error: -d|--date requires an argument" >&2
             usage
         fi
         DATE="$2"
-        sAhift
-        ;;
-    -p | --photo)
-        if (($# < 2)); then
-            echo "Error: -p requires an argument" >&2
-            usage
-        fi
-        PHOTOS="$2"
         shift
         ;;
-    -t | --dest)
-        if (($# < 2)); then
-            echo "Error: -t requires an argument" >&2
-            usage
-        fi
-        DEST="$2"
-        shift
-        ;;
-
     -*)
         echo "Unknown option: $1" >&2
         usage
@@ -73,14 +61,27 @@ while (($#)); do
     shift
 done
 
-find "$PHOTOS" -type f -newermt "$DATE" -print0 |
-    xargs -0 exiftool -fast2 \
+SD="$1"
+shift
+BACKUP="$1"
+shift
+SRC="$1"
+shift
+TARGET="$1"
+shift
+
+# Copy photos from camera internal SD card to external SSD
+# rsync -avhP "$SD" "$BACKUP" 2>"/Volumes/PHOTOS-01-T7/rsync_$(date +%Y%m%dT%H%M%S).log"
+
+# shellcheck disable=SC2016
+find "$SRC" -type f -newermt "$DATE" -print0 |
+    xargs -0 -P"$NUM_PROC" exiftool -fast2 \
         -printFormat '$Directory/$FileName|$DateTimeOriginal' \
         -dateFormat '%Y/%Y-%m/%d' |
     while IFS='|' read -r src date; do
         [ -z "$date" ] && continue
-        destdir="$DEST/$date"
-        mkdir -p "$destdir"
-        target=$(realpath --relative-to="$destdir" "$src")
-        ln -s "$target" "$destdir/" 2>/dev/null
+        target_dir="$TARGET/$date"
+        mkdir -p "$target_dir"
+        src_file=$(realpath --relative-to="$target_dir" "$src")
+        ln -sf "$src_file" "$target_dir/" 2>/dev/null
     done

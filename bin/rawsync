@@ -3,25 +3,46 @@
 usage() {
     cat <<EOF
 $(_b NAME)
-    $(_b rawsync) - Backup photos from camera
+    $(_b rawsync) - Backup photos from camera and organize into date folders
 
 $(_b SYNOPSIS)
-    $(_b "rawsync [-h] [-d | -s]") $(_u source_directory) $(_u target_directory)
+    $(_b "rawsync [-h] [-d | -e | -s | -f]") $(_u source_directory) [$(_u target_directory)]
  
 $(_b DESCRIPTION)
-    Copy files from the $(_u source_directory) to a backup destination $(_u target_directory)
-    The $(_b rsync) utility is used to do the copy and $(_b exiftool) to extract date 
-    information to create the symlinked folder structure.
+    Use $(_b rsync) to copy files from the $(_u source_directory) to a backup destination $(_u target_directory).
+    Additionally a 'by-date' folder is created with symlinks to the backups to make 
+    browsing for files by date easier.
+    If only the $(_u source_directory) is given then only symlinks are created.
+    The $(_b exiftool) is used to extract date information from the files to create the symlinks.
 
 $(_b OPTIONS)
-    -h        Show this help message
-    -d $(_u date)   Run exiftool on files modified after $(_u date)
-    -s        Create symlinks
+    $(_b -h)        Show this help message
+
+    $(_b -d) $(_u date)   Create symlinks for files modified after $(_u date) $(_i '(default: 1970-01-01)')
+
+    $(_b -e) $(_u ext)    Extensions to process $(_i '(default: *.ARW)')
+    
+    $(_b -s) $(_u sym)    Folder location for symlinks ($(_i 'default: by-date'))
+    
+    $(_b -f) $(_u fmt)    Folder date format $(_i '(default: %Y/%Y%m%d)')
  
 $(_b EXAMPLES)
-    Backup all files from attached camera to external SSD
+    Backup all files from attached camera volume SD1 to an external SSD
 
-        rawsync "/Volumes/SD1/DCIM" "/Volumes/PHOTOS-01-T7/SD Card"
+        rawsync "/Volumes/SD1/DCIM" "/Volumes/PHOTOS/RAW"
+
+    Backup files taken after 2025-12-01
+
+        rawsync -d 2025-12-01 "/Volumes/SD1/DCIM" "/Volumes/PHOTOS/RAW"
+
+    Create symlinks only from the RAW folder and place into /Volumes/PHOTOS/by-date/
+
+        rawsync "/Volumes/PHOTOS/RAW"
+
+    Create symlinks only for CR3 raw files
+
+        rawsync -e '*.CR3' "/Volumes/PHOTOS/RAW"
+
 
 EOF
     exit 0
@@ -35,12 +56,25 @@ _b() {
     printf "%s" "$(tput bold)$1$(tput sgr0)"
 }
 
+_i() {
+    printf "%s" "$(tput sitm)$1$(tput ritm)"
+}
+
 ((!$#)) && usage
 
-SRC="/Volumes/PHOTOS-01-T7/SD Card/DCIM/100MSDCF"
-TARGET="/Volumes/PHOTOS-01-T7"
-DATE="1900-01-01"
-NUM_PROC="1" #$(sysctl -n hw.ncpu)"
+_q() {
+    read -p "$1 [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Aborted."
+        exit 1
+    fi
+}
+
+SYM="by-date"
+DATE="1970-01-01"
+DATE_FMT="%Y/%Y%m%d"
+EXT='*.ARW'
 
 # Parse arguments
 while (($#)); do
@@ -48,10 +82,34 @@ while (($#)); do
     -h) usage ;;
     -d)
         if (($# < 2)); then
-            echo "Error: -d|--date requires an argument" >&2
+            echo "Error: -d requires an argument" >&2
             usage
         fi
         DATE="$2"
+        shift
+        ;;
+    -e)
+        if (($# < 2)); then
+            echo "Error: -e requires an argument" >&2
+            usage
+        fi
+        EXT="$2"
+        shift
+        ;;
+    -s)
+        if (($# < 2)); then
+            echo "Error: -s requires an argument" >&2
+            usage
+        fi
+        SYM="$2"
+        shift
+        ;;
+    -f)
+        if (($# < 2)); then
+            echo "Error: -f requires an argument" >&2
+            usage
+        fi
+        DATE_FMT="$2"
         shift
         ;;
     --)
@@ -67,27 +125,30 @@ while (($#)); do
     shift
 done
 
-SD_CARD="$1"
-shift
-BACKUP="$1"
-shift
-SRC="$1"
-shift
-TARGET="$1"
+SRC_DIR="$1"
 shift
 
-# Copy photos from camera internal SD card to external SSD
+if (($#)); then
+    TARGET="$1"
+    shift
+    TARGET_ROOT=$(echo "$TARGET" | cut -d'/' -f1-3)
 
-# rsync -avhP "$SD_CARD" "$BACKUP" 2>"/Volumes/PHOTOS-01-T7/rsync_$(date +%Y%m%dT%H%M%S).log"
+    _q "Backup $SRC_DIR to $TARGET"
+    rsync -avhP "$SRC_DIR" "$TARGET" 2>"$TARGET_ROOT/rsync_$(date +%Y%m%dT%H%M%S).log"
+else
+    TARGET_ROOT=$(echo "$SRC_DIR" | cut -d'/' -f1-3)
+fi
+
+num=$(find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" | wc -l)
+_q "Create $num symlinks in $TARGET_ROOT/$SYM from $SRC_DIR"
 
 # shellcheck disable=SC2016
-find "$SRC" -type f -newermt "$DATE" -print0 |
-    xargs -0 -P"$NUM_PROC" exiftool -fast2 \
+find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" -print0 |
+    xargs -0 exiftool -fast2 \
         -printFormat '$Directory/$FileName|$DateTimeOriginal' \
-        -dateFormat '%Y/%Y-%m/%d' |
+        -dateFormat "$DATE_FMT" |
     while IFS='|' read -r src date; do
-        [ -z "$date" ] && continue
-        target_dir="$TARGET/$date"
+        target_dir="$TARGET_ROOT/$SYM/$date"
         mkdir -p "$target_dir"
         src_file=$(realpath --relative-to="$target_dir" "$src")
         ln -sf "$src_file" "$target_dir/" 2>/dev/null

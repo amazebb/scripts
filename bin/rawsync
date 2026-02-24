@@ -1,32 +1,34 @@
 #!/usr/bin/env bash
 
 usage() {
-    cat <<EOF
-$(_b NAME)
-    $(_b rawsync) - Backup photos from camera and organize into date folders
+    (($#)) && echo "$1" >&2
 
-$(_b SYNOPSIS)
-    $(_b "rawsync [-h] [-d | -e | -s | -f]") $(_u source_directory) [$(_u target_directory)]
+    cat <<EOF
+$(B NAME)
+    $(B rawsync) - Backup photos from camera and organize into date folders
+
+$(B SYNOPSIS)
+    $(B "rawsync [-h] [-d | -e | -s | -f]") $(U source_directory) [$(U target_directory)]
  
-$(_b DESCRIPTION)
-    Use $(_b rsync) to copy files from the $(_u source_directory) to a backup destination $(_u target_directory).
+$(B DESCRIPTION)
+    Use $(B rsync) to copy files from the $(U source_directory) to a backup destination $(U target_directory).
     Additionally a 'by-date' folder is created with symlinks to the backups to make 
     browsing for files by date easier.
-    If only the $(_u source_directory) is given then only symlinks are created.
-    The $(_b exiftool) is used to extract date information from the files to create the symlinks.
+    If only the $(U source_directory) is given then only symlinks are created.
+    The $(B exiftool) is used to extract date information from the files to create the symlinks.
 
-$(_b OPTIONS)
-    $(_b -h)        Show this help message
+$(B OPTIONS)
+    $(B -h)        Show this help message
 
-    $(_b -d) $(_u date)   Create symlinks for files modified after $(_u date) $(_i '(default: 1970-01-01)')
+    $(B -d) $(U date)   Create symlinks for files modified after $(U date) $(I '(default: 1970-01-01)')
 
-    $(_b -e) $(_u ext)    Extensions to process $(_i '(default: *.ARW)')
+    $(B -e) $(U ext)    Extensions to process $(I '(default: *.ARW)')
     
-    $(_b -s) $(_u sym)    Folder location for symlinks ($(_i 'default: by-date'))
+    $(B -s) $(U sym)    Folder location for symlinks ($(I 'default: by-date'))
     
-    $(_b -f) $(_u fmt)    Folder date format $(_i '(default: %Y/%Y%m%d)')
+    $(B -f) $(U fmt)    Folder date format $(I '(default: %Y/%Y%m%d)')
  
-$(_b EXAMPLES)
+$(B EXAMPLES)
     Backup all files from attached camera volume SD1 to an external SSD
 
         rawsync "/Volumes/SD1/DCIM" "/Volumes/PHOTOS/RAW"
@@ -43,26 +45,25 @@ $(_b EXAMPLES)
 
         rawsync -e '*.CR3' "/Volumes/PHOTOS/RAW"
 
-
 EOF
     exit 0
 }
 
-_u() {
+U() {
     printf "%s" "$(tput smul)$1$(tput rmul)"
 }
 
-_b() {
+B() {
     printf "%s" "$(tput bold)$1$(tput sgr0)"
 }
 
-_i() {
+I() {
     printf "%s" "$(tput sitm)$1$(tput ritm)"
 }
 
 ((!$#)) && usage
 
-_q() {
+Q() {
     read -p "$1 [y/N] " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -71,45 +72,25 @@ _q() {
     fi
 }
 
-SYM="by-date"
-DATE="1970-01-01"
-DATE_FMT="%Y/%Y%m%d"
-EXT='*.ARW'
+argval() {
+    if (($# < 2)); then
+        usage "Error: $1 requires an argument"
+    fi
+    echo "$2"
+}
+
+typeset -A var
+var[-s]="by-date"
+var[-d]="1970-01-01"
+var[-f]="%Y/%Y%m%d"
+var[-e]='*.ARW'
 
 # Parse arguments
 while (($#)); do
     case $1 in
     -h) usage ;;
-    -d)
-        if (($# < 2)); then
-            echo "Error: -d requires an argument" >&2
-            usage
-        fi
-        DATE="$2"
-        shift
-        ;;
-    -e)
-        if (($# < 2)); then
-            echo "Error: -e requires an argument" >&2
-            usage
-        fi
-        EXT="$2"
-        shift
-        ;;
-    -s)
-        if (($# < 2)); then
-            echo "Error: -s requires an argument" >&2
-            usage
-        fi
-        SYM="$2"
-        shift
-        ;;
-    -f)
-        if (($# < 2)); then
-            echo "Error: -f requires an argument" >&2
-            usage
-        fi
-        DATE_FMT="$2"
+    -d | -e | -f | -s)
+        var["$1"]=$(argval "$@")
         shift
         ;;
     --)
@@ -117,13 +98,21 @@ while (($#)); do
         break
         ;;
     -*)
-        echo "Unknown option: $1" >&2
-        usage
+        usage "Unknown option: $1"
         ;;
-    *) break ;; # Non-option args (positionals)
+    *) break ;; # Positional arguments
     esac
     shift
 done
+
+DATE="${var[-d]}"
+EXT="${var[-e]}"
+DATE_FMT="${var[-f]}"
+SYM="${var[-s]}"
+
+if ((!$#)); then
+    usage "Error: source_directory required"
+fi
 
 SRC_DIR="$1"
 shift
@@ -133,14 +122,14 @@ if (($#)); then
     shift
     TARGET_ROOT=$(echo "$TARGET" | cut -d'/' -f1-3)
 
-    _q "Backup $SRC_DIR to $TARGET"
+    Q "Backup $SRC_DIR to $TARGET"
     rsync -avhP "$SRC_DIR" "$TARGET" 2>"$TARGET_ROOT/rsync_$(date +%Y%m%dT%H%M%S).log"
 else
     TARGET_ROOT=$(echo "$SRC_DIR" | cut -d'/' -f1-3)
 fi
 
 num=$(find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" | wc -l)
-_q "Create $num symlinks in $TARGET_ROOT/$SYM from $SRC_DIR"
+Q "Create $num symlinks in $TARGET_ROOT/$SYM from $SRC_DIR"
 
 # shellcheck disable=SC2016
 find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" -print0 |

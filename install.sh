@@ -12,5 +12,5 @@ for script in "$SCRIPT_DIR/bin"/*; do
   echo "Linked $script_name"
 done
 
-ln -sf "$HOME/Code/GitHub/rapidhash_cli/rapidhash_cli" "$TARGET_DIR/rapidhash"
+ln -sf "$HOME/Code/GitHub/rapidhash/cli/build/rapidhash" "$TARGET_DIR/rapidhash"
 echo "Linked rapidhash_cli"

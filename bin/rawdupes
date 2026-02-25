@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+
+# shellcheck disable=SC2016
+
+usage() {
+    (($#)) && echo "$1" >&2
+
+    cat <<EOF
+$(B NAME)
+    $(B rawdupes) - Find duplicate RAW images and cleanup
+
+$(B SYNOPSIS)
+    $(B "rawdupes [-h] [-e | -s]") $(U search_directory)
+ 
+$(B DESCRIPTION)
+    Find RAW duplicate images and offer to create symlinks
+
+$(B OPTIONS)
+    $(B -h)        Show this help message
+
+    $(B -e) $(U ext)    Extensions to process $(I '(default: arw)')
+    
+    $(B -s) $(U sym)    Preferred folder source for symlinks ($(I 'default: $HOME/Pictures/by-date'))
+    
+ 
+$(B EXAMPLES)
+    Find all duplicate RAW images searching recursively from current directory
+
+        rawdupes .
+
+EOF
+    exit 0
+}
+
+U() {
+    printf "%s" "$(tput smul)$1$(tput rmul)"
+}
+
+B() {
+    printf "%s" "$(tput bold)$1$(tput sgr0)"
+}
+
+I() {
+    printf "%s" "$(tput sitm)$1$(tput ritm)"
+}
+
+((!$#)) && usage
+
+Q() {
+    read -p "$1 [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ [Yy] ]]; then
+        echo "Aborted."
+        exit 1
+    fi
+}
+
+argval() {
+    if (($# < 2)); then
+        usage "Error: $1 requires an argument"
+    fi
+    echo "$2"
+}
+
+typeset -A var
+var[-s]="by-date"
+var[-e]='arw'
+
+# Parse arguments
+while (($#)); do
+    case $1 in
+    -h) usage ;;
+    -e | -s)
+        var["$1"]=$(argval "$@")
+        shift
+        ;;
+    --)
+        shift
+        break
+        ;;
+    -*)
+        usage "Unknown option: $1"
+        ;;
+    *) break ;; # Positional arguments
+    esac
+    shift
+done
+
+EXT="${var[-e]}"
+SYM="${var[-s]}"
+
+if ((!$#)); then
+    usage "Error: source_directory required"
+fi
+
+SEARCH_DIR="$1"
+shift
+
+files=$(fd "$SEARCH_DIR" -a -t f -e "$EXT" -X du -b)
+awk '{sum+=$1; n++} END {print sum/1024/1024/1024 " GB  (" n " files)"}' <<<"$files"
+
+Q "Perform a file hash?"
+echo "$files" | cut -f2 | xargs rapidhash -j 40 -s
+# awk -F'\t' -v prefer="$HOME/Pictures/by-date" '
+# {
+#     hash=$1; file=$2; size=$3
+#     count[hash]++
+#     files[hash] = files[hash] (count[hash]==1 ? "" : "\n  ") file
+#     sizes[hash] = size
+# }
+# END {
+#     total = 0
+#     num_files = 0
+#     total_dupes = 0
+#
+#     for (hash in count) {
+#         if (count[hash] > 1) {
+#             wasted = (count[hash]-1) * sizes[hash]
+#             total += wasted
+#             num_files++
+#             total_dupes += count[hash]
+#
+#             # split files into array
+#             n = split(files[hash], arr, "\n")
+#
+#             # pick preferred leader: first one that starts with prefer path
+#             leader = arr[1]
+#             for (i = 1; i <= n; i++) {
+#                 if (index(arr[i], prefer) == 1) {
+#                     leader = arr[i]
+#                     break
+#                 }
+#             }
+#
+#             printf "# dupes: %d  wasted: %.1f MiB\n", count[hash], wasted/1024/1024
+#             printf "# leader: %s\n", leader
+#             for (i = 1; i <= n; i++) {
+#                 if (arr[i] != leader) {
+#                     printf "ln -sf %s %s\n", leader, arr[i]
+#                 }
+#             }
+#             printf "\n"
+#         }
+#     }
+#     printf "# Total wasted: %.1f MiB\n", total/1024/1024
+#     printf "# Unique duplicates: %d\n", num_files
+#     printf "# Duplicate files: %d\n", total_dupes
+#     printf "# Could symlink %d files\n", total_dupes - num_files
+# }
+# '

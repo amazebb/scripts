@@ -11,7 +11,8 @@ $(B NAME)
 
 $(B SYNOPSIS)
     $(B "rawdupes [-h] [-e | -s]") $(U search_directory)
- 
+    $(B "rawdupes -f") [$(U hash_file)]
+
 $(B DESCRIPTION)
     Find RAW duplicate images and offer to create symlinks
 
@@ -22,7 +23,8 @@ $(B OPTIONS)
     
     $(B -s) $(U sym)    Preferred folder source for symlinks ($(I 'default: $HOME/Pictures/by-date'))
     
- 
+    $(B -f) [$(U file)] Analyze previously generated hash file ($(I 'default: $PWD/files.hash'))
+
 $(B EXAMPLES)
     Find all duplicate RAW images searching recursively from current directory
 
@@ -63,13 +65,16 @@ argval() {
 }
 
 typeset -A var
-var[-s]="by-date"
+var[-s]="$HOME/Pictures/by-date"
 var[-e]='arw'
+var[-f]="files.hash"
+run_hash=true
 
 # Parse arguments
 while (($#)); do
     case $1 in
     -h) usage ;;
+    -f) run_hash=false ;;
     -e | -s)
         var["$1"]=$(argval "$@")
         shift
@@ -89,62 +94,25 @@ done
 EXT="${var[-e]}"
 SYM="${var[-s]}"
 
-if ((!$#)); then
+if ((!$#)) && $run_hash; then
     usage "Error: source_directory required"
+elif $run_hash; then
+    SEARCH_DIR="$1"
+elif (($#)) && ! $run_hash; then
+    FILE="$1"
+elif ((!$#)) && ! $run_hash; then
+    FILE="$PWD/files.hash"
 fi
 
-SEARCH_DIR="$1"
-shift
+# shift
+if $run_hash; then
+    files=$(fd "$SEARCH_DIR" -a -t f -e "$EXT" -X du -b)
+    awk '{sum+=$1; n++} END {print sum/1024/1024/1024 " GB  (" n " files)"}' <<<"$files"
 
-files=$(fd "$SEARCH_DIR" -a -t f -e "$EXT" -X du -b)
-awk '{sum+=$1; n++} END {print sum/1024/1024/1024 " GB  (" n " files)"}' <<<"$files"
+    Q "Perform a file hash on the above files?"
+    echo "$files" | cut -f2- | rapidhash -j 40 -s -p >files.hash
+    echo "File hashes written to $PWD/files.hash"
+fi
 
-Q "Perform a file hash?"
-echo "$files" | cut -f2 | xargs rapidhash -j 40 -s
-# awk -F'\t' -v prefer="$HOME/Pictures/by-date" '
-# {
-#     hash=$1; file=$2; size=$3
-#     count[hash]++
-#     files[hash] = files[hash] (count[hash]==1 ? "" : "\n  ") file
-#     sizes[hash] = size
-# }
-# END {
-#     total = 0
-#     num_files = 0
-#     total_dupes = 0
-#
-#     for (hash in count) {
-#         if (count[hash] > 1) {
-#             wasted = (count[hash]-1) * sizes[hash]
-#             total += wasted
-#             num_files++
-#             total_dupes += count[hash]
-#
-#             # split files into array
-#             n = split(files[hash], arr, "\n")
-#
-#             # pick preferred leader: first one that starts with prefer path
-#             leader = arr[1]
-#             for (i = 1; i <= n; i++) {
-#                 if (index(arr[i], prefer) == 1) {
-#                     leader = arr[i]
-#                     break
-#                 }
-#             }
-#
-#             printf "# dupes: %d  wasted: %.1f MiB\n", count[hash], wasted/1024/1024
-#             printf "# leader: %s\n", leader
-#             for (i = 1; i <= n; i++) {
-#                 if (arr[i] != leader) {
-#                     printf "ln -sf %s %s\n", leader, arr[i]
-#                 }
-#             }
-#             printf "\n"
-#         }
-#     }
-#     printf "# Total wasted: %.1f MiB\n", total/1024/1024
-#     printf "# Unique duplicates: %d\n", num_files
-#     printf "# Duplicate files: %d\n", total_dupes
-#     printf "# Could symlink %d files\n", total_dupes - num_files
-# }
-# '
+awk -F'\t' -v prefer="$SYM" \
+    -f "$(dirname "$(realpath "$0")")/process-dupes.awk" "$FILE"

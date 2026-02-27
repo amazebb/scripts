@@ -3,7 +3,10 @@
 # shellcheck disable=SC2016
 
 usage() {
-    (($#)) && echo "$1" >&2
+    if [ $# -ne 0 ]; then
+        printf "\033[31m%s\033[0m\n" "$1" >&2
+        exit 1
+    fi
 
     cat <<EOF
 $(B NAME)
@@ -11,7 +14,7 @@ $(B NAME)
 
 $(B SYNOPSIS)
     $(B "rawdupes [-h] [-e | -s]") $(U search_directory)
-    $(B "rawdupes -f") [$(U hash_file)]
+    $(B "rawdupes -f") $(U hash_file)
 
 $(B DESCRIPTION)
     Find RAW duplicate images and offer to create symlinks
@@ -23,7 +26,7 @@ $(B OPTIONS)
     
     $(B -s) $(U sym)    Preferred folder source for symlinks ($(I 'default: $HOME/Pictures/by-date'))
     
-    $(B -f) [$(U file)] Analyze previously generated hash file ($(I 'default: $PWD/files.hash'))
+    $(B -f) $(U file)   Analyze previously generated hash file 
 
 $(B EXAMPLES)
     Find all duplicate RAW images searching recursively from current directory
@@ -59,6 +62,9 @@ Q() {
 
 argval() {
     if (($# < 2)); then
+        # NOTE since usgae is called in a sub-shell the exit 1 does not exit
+        # immediately, so the below parse args while loop will cycle through
+        # all entered args.
         usage "Error: $1 requires an argument"
     fi
     echo "$2"
@@ -67,7 +73,6 @@ argval() {
 typeset -A var
 var[-s]="$HOME/Pictures/by-date"
 var[-e]='arw'
-var[-f]="files.hash"
 run_hash=true
 
 # Parse arguments
@@ -76,6 +81,7 @@ while (($#)); do
     -h) usage ;;
     -f) run_hash=false ;;
     -e | -s)
+        # Append '|| exit 1' to exit on first bad arg.
         var["$1"]=$(argval "$@")
         shift
         ;;
@@ -101,10 +107,9 @@ elif $run_hash; then
 elif (($#)) && ! $run_hash; then
     FILE="$1"
 elif ((!$#)) && ! $run_hash; then
-    FILE="$PWD/files.hash"
+    usage "Error: hash file required"
 fi
 
-# shift
 if $run_hash; then
     files=$(fd "$SEARCH_DIR" -a -t f -e "$EXT" -X du -b)
     awk '{sum+=$1; n++} END {print sum/1024/1024/1024 " GB  (" n " files)"}' <<<"$files"

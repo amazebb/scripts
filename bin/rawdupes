@@ -52,7 +52,7 @@ I() {
 ((!$#)) && usage
 
 Q() {
-    read -p "$1 [y/N] " -n 1 -r
+    read -p "$1 [y/n] " -n 1 -r
     echo
     if [[ ! $REPLY =~ [Yy] ]]; then
         echo "Aborted."
@@ -62,7 +62,7 @@ Q() {
 
 argval() {
     if (($# < 2)); then
-        # NOTE since usgae is called in a sub-shell the exit 1 does not exit
+        # NOTE since 'usage' is called in a sub-shell the exit 1 does not exit
         # immediately, so the below parse args while loop will cycle through
         # all entered args.
         usage "Error: $1 requires an argument"
@@ -111,10 +111,16 @@ elif ((!$#)) && ! $run_hash; then
 fi
 
 if $run_hash; then
-    files=$(fd "$SEARCH_DIR" -a -t f -e "$EXT" -X du -b)
-    awk '{sum+=$1; n++} END {print sum/1024/1024/1024 " GB  (" n " files)"}' <<<"$files"
+    files=$(fd "$SEARCH_DIR" -a -tf -e "$EXT" -X du -b)
+    sz=$(awk '{sum+=$1} 
+END {
+    if (sum >= 1024*1024*1024) printf "%.1f GiB\n", sum/1024/1024/1024
+    else if (sum >= 1024*1024)   printf "%.1f MiB\n", sum/1024/1024
+    else if (sum >= 1024)        printf "%.1f KiB\n", sum/1024
+    else                         printf "%d Bi\n", sum
+  }' <<<"$files")
 
-    Q "Perform a file hash on the above files?"
+    Q "Find duplicate ${EXT^^} files among $(echo "$files" | wc -l) files ($sz) ?"
     echo "$files" | cut -f2- | rapidhash -j 40 -s -p >files.hash
     echo "File hashes written to $PWD/files.hash"
 fi

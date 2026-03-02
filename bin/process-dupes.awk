@@ -1,19 +1,20 @@
-function summary(_total, _num_files, _total_dupes, i, j) {
-    _total = 0
-    _num_files = 0
-    _total_dupes = 0
+function summary() {
+    total = 0
+    num_files = 0
+    total_dupes = 0
+    no_link = 0
 
     for (i = 1; i <= length(count); i++) {
         if (count[i] > 1) {
             wasted = (count[i] - 1) * sizes[i]
-            _total += wasted
-            _num_files++
-            _total_dupes += count[i]
+            total += wasted
+            num_files++
+            total_dupes += count[i]
 
             n = split(files[i], arr, "\n")
 
             # pick preferred leader: first one that starts with prefer path
-            source = arr[1]
+            source = "" arr[1]
 
             for (j = 1; j <= n; j++) {
                 if (index(arr[j], prefer) == 1) {
@@ -27,6 +28,11 @@ function summary(_total, _num_files, _total_dupes, i, j) {
                 count[i] - 1,
                 wasted / 1024 / 1024\
             )
+
+            if (source == "") {
+                no_link++
+                break
+            }
 
             for (j = 1; j <= n; j++) {
                 if (arr[j] != source) {
@@ -46,10 +52,12 @@ function summary(_total, _num_files, _total_dupes, i, j) {
         }
     }
 
-    printf("Total wasted: %.1f MiB\n", _total / 1024 / 1024)
-    printf("Duplicate files: %d\n", _total_dupes)
-    printf("Unique duplicates: %d\n", _num_files)
-    printf("Could symlink %d files\n", _total_dupes - _num_files)
+    printf("Total wasted: %.1f MiB\n", total / 1024 / 1024)
+    printf("Duplicate files: %d\n", total_dupes)
+    printf("Unique duplicates: %d\n", num_files)
+    printf("Could symlink %d files\n", total_dupes - num_files)
+
+    if (no_link) printf("%d groups of files could not be symlinked", no_link)
 }
 
 function sort_arrays(_sorted_count, _sorted_files, _sorted_sizes, i) {

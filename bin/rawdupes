@@ -13,20 +13,24 @@ $(B NAME)
     $(B rawdupes) - Find duplicate RAW images and cleanup
 
 $(B SYNOPSIS)
-    $(B "rawdupes [-h] [-e | -s]") $(U search_directory)
+    $(B "rawdupes [-h] [-e | -s | -w]") $(U search_directory)
     $(B "rawdupes -f") $(U hash_file)
 
 $(B DESCRIPTION)
-    Find RAW duplicate images and offer to create symlinks
+    Find RAW duplicate images and offer to create symlinks.
+    The search results including hash, filename and size are written to file.
 
 $(B OPTIONS)
     $(B -h)        Show this help message
 
-    $(B -e) $(U ext)    Extensions to process $(I '(default: arw)')
+    $(B -e) [$(U ext)]  Extensions to process, ignore-case $(I '(default: ARW)')
     
-    $(B -s) $(U sym)    Preferred folder source for symlinks ($(I 'default: $HOME/Pictures/by-date'))
+    $(B -s) [$(U sym)]  Preferred folder source for symlinks ($(I 'default: $HOME/Pictures/by-date'))
     
-    $(B -f) $(U file)   Analyze previously generated hash file 
+    $(B -w) [$(U file)] Output of duplicate search results ($(I 'default: $PWD/files.hash)') 
+    
+    $(B -f) $(U file)   Analyze previously generated search results file
+
 
 $(B EXAMPLES)
     Find all duplicate RAW images searching recursively from current directory
@@ -73,6 +77,7 @@ argval() {
 typeset -A var
 var[-s]="$HOME/Pictures/by-date"
 var[-e]='arw'
+var[-w]="$PWD/files.hash"
 run_hash=true
 
 # Parse arguments
@@ -80,7 +85,7 @@ while (($#)); do
     case $1 in
     -h) usage ;;
     -f) run_hash=false ;;
-    -e | -s)
+    -e | -s | -w)
         # Append '|| exit 1' to exit on first bad arg.
         var["$1"]=$(argval "$@")
         shift
@@ -99,6 +104,7 @@ done
 
 EXT="${var[-e]}"
 SYM="${var[-s]}"
+FILE="${var[-w]}"
 
 if ((!$#)) && $run_hash; then
     usage "Error: source_directory required"
@@ -112,6 +118,7 @@ fi
 
 if $run_hash; then
     files=$(fd "$SEARCH_DIR" -a -tf -e "$EXT" -X du -b)
+    [[ $files == "" ]] && echo "No files found" && exit 0
     sz=$(awk '{sum+=$1} 
 END {
     if (sum >= 1024*1024*1024) printf "%.1f GiB\n", sum/1024/1024/1024
@@ -120,9 +127,9 @@ END {
     else                         printf "%d Bi\n", sum
   }' <<<"$files")
 
-    Q "Find duplicate ${EXT^^} files among $(echo "$files" | wc -l) files ($sz) ?"
-    echo "$files" | cut -f2- | rapidhash -j 40 -s -p >files.hash
-    echo "File hashes written to $PWD/files.hash"
+    Q "Find duplicate ${EXT^^} [$(echo "$files" | wc -l) files ($sz)] ?"
+    echo "$files" | cut -f2- | rapidhash -j 40 -s -p >"$FILE"
+    echo "File hashes written to $FILE"
 fi
 
 awk -F'\t' -v prefer="$SYM" \

@@ -11,15 +11,16 @@ function summary() {
             num_files++
             total_dupes += count[i]
 
-            n = split(files[i], arr, "\n")
+            num_dupes = split(files[i], arr, "\n")
 
-            # pick preferred leader: first one that starts with prefer path
-            source = "" arr[1]
-
-            for (j = 1; j <= n; j++) {
-                if (index(arr[j], prefer) == 1) {
-                    source = arr[j]
-                    break
+            source = ""
+            # pick preferred leader: first one that starts with PREF_DUPE_DIR
+            if (PREF_DUPE_DIR != "") {
+                for (j = 1; j <= num_dupes; j++) {
+                    if (index(arr[j], PREF_DUPE_DIR) == 1) {
+                        source = arr[j]
+                        break
+                    }
                 }
             }
 
@@ -29,35 +30,39 @@ function summary() {
                 wasted / 1024 / 1024\
             )
 
-            if (source == "") {
-                no_link++
-                break
-            }
+            for (j = 1; j <= num_dupes; j++) {
+                if (arr[j] != source && source != "") {
+                    if (LINK_DRY_RUN == "yes") {
+                        printf("ln -sf \"%s\" \"%s\"\n", source, arr[j])
+                    }
+                    else {
+                        cmd = sprintf("ln -sf \"%s\" \"%s\"", source, arr[j])
 
-            for (j = 1; j <= n; j++) {
-                if (arr[j] != source) {
-                    printf("ln -sf \"%s\" \"%s\"\n", source, arr[j])
-
-                    # cmd = sprintf("ln -sf \"%s\" \"%s\"", source, arr[j])
-                    #
-                    # if (system(cmd) != 0) {
-                    #     print\
-                    #         "Error: Failed to create symlink " arr[j] " -> "\
-                    #             source > "/dev/stderr"
-                    # }
+                        if (system(cmd) != 0) {
+                            print\
+                                "Error: Failed to create symlink " arr[j]\
+                                    " -> "\
+                                    source > "/dev/stderr"
+                        }
+                    }
+                }
+                else if (source == "") {
+                    no_link++
+                    printf("%s\n", arr[j])
                 }
             }
-
-            printf("\n")
         }
+
+        printf("\n")
     }
 
     printf("Total wasted: %.1f MiB\n", total / 1024 / 1024)
     printf("Duplicate files: %d\n", total_dupes)
     printf("Unique duplicates: %d\n", num_files)
-    printf("Could symlink %d files\n", total_dupes - num_files)
+    printf("Could symlink: %d\n", total_dupes - num_files)
 
-    if (no_link) printf("%d groups of files could not be symlinked", no_link)
+    if (no_link && PREF_DUPE_DIR != "")
+        printf("%d groups of files could not be symlinked\n", no_link)
 }
 
 function sort_arrays(_sorted_count, _sorted_files, _sorted_sizes, i) {

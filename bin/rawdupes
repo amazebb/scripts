@@ -23,19 +23,20 @@ $(B DESCRIPTION)
 $(B OPTIONS)
     $(B -h)        Show this help message
 
-    $(B -e) [$(U ext)]  Extensions to process, ignore-case $(I '(default: ARW)')
+    $(B -e) [$(U ext)]  Extensions to process ignoring-case $(I '(default: all files)')
     
-    $(B -s) [$(U sym)]  Preferred folder source for symlinks ($(I 'default: $HOME/Pictures/by-date'))
+    $(B -s) $(U sym)  Preferred folder source for symlinks ($(I 'default: none specified'))
     
     $(B -w) [$(U file)] Output of duplicate search results ($(I 'default: $PWD/files.hash)') 
     
     $(B -f) $(U file)   Analyze previously generated search results file
 
+    Zero byte files are ignored in the search.
 
 $(B EXAMPLES)
-    Find all duplicate RAW images searching recursively from current directory
+    Find all duplicate Sony RAW images (ARW) searching recursively from current directory
 
-        rawdupes .
+        rawdupes -e arw .
 
 EOF
     exit 0
@@ -53,7 +54,7 @@ I() {
     printf "%s" "$(tput sitm)$1$(tput ritm)"
 }
 
-((!$#)) && usage
+((!$#)) && usage "Error: no arguments provided"
 
 Q() {
     read -p "$1 [y/n] " -n 1 -r
@@ -62,6 +63,11 @@ Q() {
         echo "Aborted."
         exit 1
     fi
+}
+
+ask() {
+    read -p "$1: " -r
+    echo "$REPLY"
 }
 
 argval() {
@@ -75,8 +81,8 @@ argval() {
 }
 
 typeset -A var
-var[-s]="$HOME/Pictures/by-date"
-var[-e]='arw'
+var[-s]=''
+var[-e]=''
 var[-w]="$PWD/files.hash"
 run_hash=true
 
@@ -84,10 +90,10 @@ run_hash=true
 while (($#)); do
     case $1 in
     -h) usage ;;
-    -f) run_hash=false ;;
-    -e | -s | -w)
+    -e | -s | -w | -f)
         # Append '|| exit 1' to exit on first bad arg.
         var["$1"]=$(argval "$@")
+        [[ "$1" == "-f" ]] && run_hash=false
         shift
         ;;
     --)
@@ -103,22 +109,22 @@ while (($#)); do
 done
 
 EXT="${var[-e]}"
-SYM="${var[-s]}"
+SYM=$(realpath "${var[-s]}" 2>/dev/null)
 FILE="${var[-w]}"
 
 if ((!$#)) && $run_hash; then
     usage "Error: source_directory required"
 elif $run_hash; then
     SEARCH_DIR="$1"
-elif (($#)) && ! $run_hash; then
-    FILE="$1"
-elif ((!$#)) && ! $run_hash; then
-    usage "Error: hash file required"
+elif ! $run_hash; then
+    FILE="${var[-f]}"
 fi
 
 if $run_hash; then
-    files=$(fd "$SEARCH_DIR" -a -tf -e "$EXT" -X du -b)
-    [[ $files == "" ]] && echo "No files found" && exit 0
+    [[ "$EXT" != "" ]] &&
+        files=$(fd -a -tf -e "$EXT" -S +1b -X du -b . "$SEARCH_DIR") ||
+        files=$(fd -a -tf -S +1b -X du -b . "$SEARCH_DIR")
+
     sz=$(awk '{sum+=$1} 
 END {
     if (sum >= 1024*1024*1024) printf "%.1f GiB\n", sum/1024/1024/1024
@@ -128,9 +134,28 @@ END {
   }' <<<"$files")
 
     Q "Find duplicate ${EXT^^} [$(echo "$files" | wc -l) files ($sz)] ?"
-    echo "$files" | cut -f2- | rapidhash -j 40 -s -p >"$FILE"
+    echo "$files" | cut -f2- | rapidhash -j 40 -s -p |
+        sort -n -k3 -t $'\t' >"$FILE.tmp" && mv "$FILE.tmp" "$FILE"
     echo "File hashes written to $FILE"
 fi
 
-awk -F'\t' -v prefer="$SYM" \
+awk -F'\t' -v PREF_DUPE_DIR="$SYM" -v LINK_DRY_RUN="yes" \
+    -f "$(dirname "$(realpath "$0")")/process-dupes.awk" "$FILE"
+
+echo
+Q "Do you wish to symlink these files ?"
+
+while [[ "$SYM" == "" ]]; do
+    SYM=$(ask "Enter preferred target directory, can be relative or\
+ fullpath (CTRL-C to cancel)")
+    [[ $SYM == "" ]] && continue
+
+    SYM=$(realpath "$SYM")
+    [[ ! -d "$SYM" ]] && echo "$SYM Not a valid directory" && SYM=""
+    echo
+done
+
+Q "Use $SYM as preferred symlink target ?"
+
+awk -F'\t' -v PREF_DUPE_DIR="$SYM" -v LINK_DRY_RUN="no" \
     -f "$(dirname "$(realpath "$0")")/process-dupes.awk" "$FILE"

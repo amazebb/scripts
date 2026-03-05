@@ -5,11 +5,11 @@
 usage() {
     cat <<EOF
 $(B NAME)
-    $(B rawdupes) - Find duplicate files and offer to create symlinks
+    $(B dedupe) - Find duplicate files and offer to create symlinks
 
 $(B SYNOPSIS)
-    $(B "rawdupes [-h] [-e | -s | -w]") $(U search_directory)
-    $(B "rawdupes -f") $(U hash_file)
+    $(B "dedupe [-h] [-e | -s | -w]") $(U search_directory)
+    $(B "dedupe -f") $(U hash_file)
 
 $(B DESCRIPTION)
     Find duplicate files and offer to create symlinks.
@@ -31,7 +31,7 @@ $(B OPTIONS)
 $(B EXAMPLES)
     Find all duplicate Sony RAW images (ARW) searching recursively from current directory
 
-        rawdupes -e arw .
+        dedupe -e arw .
 
 EOF
 }

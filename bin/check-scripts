@@ -5,7 +5,7 @@
 usage() {
     echo "Usage: $(basename "$0") [directory] [options]"
     echo "Arguments:"
-    echo "  directory  Directory to search for shell scripts (default: ~/.local/scripts)"
+    echo "  directory  Directory to search for shell scripts (default: ~/.local/share/scripts/bin)"
     echo "Options:"
     echo "  -h    Display this help message"
     echo "  -v    Verbose mode, show full shellcheck output"
@@ -14,7 +14,7 @@ usage() {
 }
 
 # Default values
-DIR=~/.local/scripts
+DIR=~/.local/share/scripts/bin/
 VERBOSE=false
 
 # Parse options with getopts

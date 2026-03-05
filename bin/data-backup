@@ -96,7 +96,7 @@ else
     fi
 fi
 
-if ! ~/.local/scripts/gitea-cli stop; then
+if ! gitea-cli stop; then
     echo "Error: Failed to stop Gitea"
     hdiutil detach "$MOUNT_POINT"
     exit 1
@@ -140,7 +140,7 @@ if ! hdiutil detach "$MOUNT_POINT"; then
     exit 1
 fi
 
-if ! ~/.local/scripts/gitea-cli start; then
+if ! gitea-cli start; then
     echo "Error: Backup succesfull but failed to start Gitea"
     exit 1
 fi

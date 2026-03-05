@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# List scripts with descriptions in $HOME/.local/scripts.
+# List scripts with descriptions in $HOME/.local/share/scripts/bin
 
 # Directory to search for script
 DIR=${1:-$HOME/.local/share/scripts/bin}

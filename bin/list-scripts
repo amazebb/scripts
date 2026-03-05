@@ -9,7 +9,7 @@ A=(Name)
 B=(Shell)
 C=(Description)
 
-find "$DIR" -type f -depth 1 | sort -k1 | while read -r script; do
+find "$DIR" -type f ! -name "*.*" -depth 1 | sort -k1 | while read -r script; do
     # Get the script name (basename removes the path)
     A+=($(basename "$script"))
 

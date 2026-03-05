@@ -3,21 +3,16 @@
 # shellcheck disable=SC2016
 
 usage() {
-    if [ $# -ne 0 ]; then
-        printf "\033[31m%s\033[0m\n" "$1" >&2
-        exit 1
-    fi
-
     cat <<EOF
 $(B NAME)
-    $(B rawdupes) - Find duplicate RAW images and cleanup
+    $(B rawdupes) - Find duplicate files and offer to create symlinks
 
 $(B SYNOPSIS)
     $(B "rawdupes [-h] [-e | -s | -w]") $(U search_directory)
     $(B "rawdupes -f") $(U hash_file)
 
 $(B DESCRIPTION)
-    Find RAW duplicate images and offer to create symlinks.
+    Find duplicate files and offer to create symlinks.
     The search results including hash, filename and size are written to file.
 
 $(B OPTIONS)
@@ -25,7 +20,7 @@ $(B OPTIONS)
 
     $(B -e) [$(U ext)]  Extensions to process ignoring-case $(I '(default: all files)')
     
-    $(B -s) $(U sym)  Preferred folder source for symlinks ($(I 'default: none specified'))
+    $(B -s) $(U sym)    Preferred folder source for symlinks ($(I 'default: none specified'))
     
     $(B -w) [$(U file)] Output of duplicate search results ($(I 'default: $PWD/files.hash)') 
     
@@ -39,7 +34,13 @@ $(B EXAMPLES)
         rawdupes -e arw .
 
 EOF
-    exit 0
+}
+
+warn() {
+    if [ $# -ne 0 ]; then
+        printf "\033[31m%s\033[0m\n" "$1" >&2
+    fi
+    (($# < 2)) && exit 1 || ([[ "$2" == "-1" ]] && return 0) || exit "${2:-1}"
 }
 
 U() {
@@ -54,10 +55,10 @@ I() {
     printf "%s" "$(tput sitm)$1$(tput ritm)"
 }
 
-((!$#)) && usage "Error: no arguments provided"
+((!$#)) && warn "Error: no arguments provided" -1 && usage && exit 1
 
 Q() {
-    read -p "$1 [y/n] " -n 1 -r
+    read -p "$1 [y/n]: " -r
     echo
     if [[ ! $REPLY =~ [Yy] ]]; then
         echo "Aborted."
@@ -72,10 +73,10 @@ ask() {
 
 argval() {
     if (($# < 2)); then
-        # NOTE since 'usage' is called in a sub-shell the exit 1 does not exit
+        # NOTE since 'warn' is called in a sub-shell the exit 1 does not exit
         # immediately, so the below parse args while loop will cycle through
         # all entered args.
-        usage "Error: $1 requires an argument"
+        warn "Error: $1 requires an argument"
     fi
     echo "$2"
 }
@@ -89,7 +90,7 @@ run_hash=true
 # Parse arguments
 while (($#)); do
     case $1 in
-    -h) usage ;;
+    -h) usage && exit 0 ;;
     -e | -s | -w | -f)
         # Append '|| exit 1' to exit on first bad arg.
         var["$1"]=$(argval "$@")
@@ -101,7 +102,7 @@ while (($#)); do
         break
         ;;
     -*)
-        usage "Unknown option: $1"
+        warn "Unknown option: $1"
         ;;
     *) break ;; # Positional arguments
     esac
@@ -113,7 +114,7 @@ SYM=$(realpath "${var[-s]}" 2>/dev/null)
 FILE="${var[-w]}"
 
 if ((!$#)) && $run_hash; then
-    usage "Error: source_directory required"
+    warn "Error: source_directory required"
 elif $run_hash; then
     SEARCH_DIR="$1"
 elif ! $run_hash; then
@@ -122,8 +123,8 @@ fi
 
 if $run_hash; then
     [[ "$EXT" != "" ]] &&
-        files=$(fd -a -tf -e "$EXT" -S +1b -X du -b . "$SEARCH_DIR") ||
-        files=$(fd -a -tf -S +1b -X du -b . "$SEARCH_DIR")
+        files=$(fd -a -tf -e "$EXT" -S +1b -X du -b \; "$SEARCH_DIR") ||
+        files=$(fd -a -tf -S +1b -X du -b \; "$SEARCH_DIR")
 
     sz=$(awk '{sum+=$1} 
 END {
@@ -139,7 +140,7 @@ END {
     echo "File hashes written to $FILE"
 fi
 
-awk -F'\t' -v PREF_DUPE_DIR="$SYM" -v LINK_DRY_RUN="yes" \
+awk -F'\t' -v PREF_DUPE_DIR="$SYM" -v DRY_RUN="yes" \
     -f "$(dirname "$(realpath "$0")")/process-dupes.awk" "$FILE"
 
 echo
@@ -155,7 +156,7 @@ while [[ "$SYM" == "" ]]; do
     echo
 done
 
-Q "Use $SYM as preferred symlink target ?"
-
-awk -F'\t' -v PREF_DUPE_DIR="$SYM" -v LINK_DRY_RUN="no" \
-    -f "$(dirname "$(realpath "$0")")/process-dupes.awk" "$FILE"
+run=$(ask "Use $SYM as preferred symlink target ? [y/n/d (dry-run)]")
+[[ "$run" == "y" || "$run" == "d" ]] &&
+    awk -F'\t' -v PREF_DUPE_DIR="$SYM" -v DRY_RUN="$run" \
+        -f "$(dirname "$(realpath "$0")")/process-dupes.awk" "$FILE"

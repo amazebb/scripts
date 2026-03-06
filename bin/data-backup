@@ -20,7 +20,7 @@ $(B OPTIONS)
 
     $(B -s) $(U bundle)     Sparse bundle path $(I '(default: ~/Library/Mobile Documents/.../SPARSE.sparsebundle)')
 
-    $(B -m) $(U mountpoint)  Mount point $(I '(default: /Volumes/SPARSE)')
+    $(B -m) $(U mountpoint) Mount point $(I '(default: /Volumes/SPARSE)')
 
 $(B EXAMPLES)
     Backup two folders to the default sparse bundle

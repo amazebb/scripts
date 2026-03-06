@@ -1,146 +1,176 @@
 #!/usr/bin/env bash
-# Backup to SPARSE image in iCloud.
+# Backup folders to SPARSE image in iCloud.
 
-# Version
-VERSION="1.0.0"
+# shellcheck disable=SC2016
 
-# Help function
 usage() {
-    echo "Usage: data-backup folder1 [folder2 ...] [options]"
-    echo "Options:"
-    echo "  -h    Display this help message"
-    echo "  -v    Display version information"
-    echo "  -s    Sparse bundle folder (default: $HOME/Library/Mobile Documents/com~apple~CloudDocs/SPARSE.sparsebundle)"
-    echo "  -m    Mount point (default: /Volumes/SPARSE)"
-    echo " "
-    echo " Example: To create a 10g SPARSEBUNDLE:"
-    echo " hdiutil create -size 10g -type SPARSEBUNDLE -fs APFS -encryption -stdinpass -volname SPARSE '$HOME/Library/Mobile Documents/com~apple~CloudDocs/SPARSE.sparsebundle'"
-    exit 0
+    cat <<EOF
+$(B NAME)
+    $(B data-backup) - Backup folders to encrypted sparse bundle in iCloud
+
+$(B SYNOPSIS)
+    $(B "data-backup [-h] [-s bundle] [-m mountpoint]") $(U folder) [$(U folder) ...]
+
+$(B DESCRIPTION)
+    Compress folders with 7z and rsync them into an encrypted APFS sparse
+    bundle stored in iCloud. Stops Gitea before backup and restarts it after.
+
+$(B OPTIONS)
+    $(B -h)            Show this help message
+
+    $(B -s) $(U bundle)     Sparse bundle path $(I '(default: ~/Library/Mobile Documents/.../SPARSE.sparsebundle)')
+
+    $(B -m) $(U mountpoint)  Mount point $(I '(default: /Volumes/SPARSE)')
+
+$(B EXAMPLES)
+    Backup two folders to the default sparse bundle
+
+        data-backup ~/Documents ~/Projects
+
+    Create the sparse bundle (one-time setup)
+
+        hdiutil create -size 10g -type SPARSEBUNDLE -fs APFS \\
+            -encryption -stdinpass -volname SPARSE \\
+            ~/Library/Mobile\ Documents/com~apple~CloudDocs/SPARSE.sparsebundle
+
+EOF
 }
 
-# Version function
-version() {
-    echo "$VERSION"
-    exit 0
+warn() {
+    if [ $# -ne 0 ]; then
+        printf "\033[31m%s\033[0m\n" "$1" >&2
+    fi
+    (($# < 2)) && exit 1 || ([[ "$2" == "-1" ]] && return 0) || exit "${2:-1}"
 }
 
-# Check if no arguments are provided
-if [[ $# -eq 0 ]]; then
-    usage
-fi
+U() {
+    printf "%s" "$(tput smul)$1$(tput rmul)"
+}
+
+B() {
+    printf "%s" "$(tput bold)$1$(tput sgr0)"
+}
+
+I() {
+    printf "%s" "$(tput sitm)$1$(tput ritm)"
+}
+
+Q() {
+    read -p "$1 [y/n]: " -r
+    echo
+    if [[ ! $REPLY =~ [Yy] ]]; then
+        echo "Aborted."
+        exit 1
+    fi
+}
+
+ask() {
+    read -p "$1: " -r
+    echo "$REPLY"
+}
+
+argval() {
+    if (($# < 2)); then
+        warn "Error: $1 requires an argument"
+    fi
+    echo "$2"
+}
+
+((!$#)) && warn "Error: no arguments provided" -1 && usage && exit 1
 
 SPARSE_BUNDLE="$HOME/Library/Mobile Documents/com~apple~CloudDocs/SPARSE.sparsebundle"
 MOUNT_POINT="/Volumes/SPARSE"
-FOLDERS=()
 
-# Parse options with getopts
-while getopts "hvs:m:" opt; do
-    case "$opt" in
-    h) usage ;;
-    v) version ;;
-    s) SPARSE_BUNDLE="$OPTARG" ;;
-    m) MOUNT_POINT="$OPTARG" ;;
-    ?) usage ;;
+# Parse arguments
+while (($#)); do
+    case $1 in
+    -h) usage && exit 0 ;;
+    -s)
+        SPARSE_BUNDLE=$(argval "$@")
+        shift
+        ;;
+    -m)
+        MOUNT_POINT=$(argval "$@")
+        shift
+        ;;
+    --)
+        shift
+        break
+        ;;
+    -*)
+        warn "Unknown option: $1"
+        ;;
+    *) break ;;
     esac
-done
-
-# Shift past the options
-shift $((OPTIND - 1))
-
-# Collect remaining arguments as folder names
-while [[ $# -gt 0 ]]; do
-    FOLDERS+=("$1")
     shift
 done
 
-# Ensure at least one folder is provided
-if [[ ${#FOLDERS[@]} -eq 0 ]]; then
-    echo "Error: At least one folder name is required"
-    usage
-fi
+FOLDERS=("$@")
 
-# Example: Print what we got (replace with your backup logic)
+((!${#FOLDERS[@]})) && warn "Error: at least one folder is required"
+
 printf "Folders to backup: %s\n" "${FOLDERS[*]}"
-echo "Sparse bundle: $SPARSE_BUNDLE"
-echo "Mount point: $MOUNT_POINT"
-
-PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+printf "Sparse bundle: %s\n" "$SPARSE_BUNDLE"
+printf "Mount point: %s\n" "$MOUNT_POINT"
 
 read -r -s -p "Enter sparse bundle password: " PASSWORD
 echo
 
-echo "Debug: Checking sparse bundle at $SPARSE_BUNDLE"
-if [ ! -d "$SPARSE_BUNDLE" ]; then
-    echo "Error: Sparse bundle file not found"
-    exit 1
-fi
-if [ ! -r "$SPARSE_BUNDLE" ]; then
-    echo "Error: No read permission for sparse bundle"
-    exit 1
-fi
+[[ ! -d "$SPARSE_BUNDLE" ]] && warn "Error: Sparse bundle not found at $SPARSE_BUNDLE"
+[[ ! -r "$SPARSE_BUNDLE" ]] && warn "Error: No read permission for sparse bundle"
 
-if [ -d "$MOUNT_POINT" ]; then
-    echo "Debug: $MOUNT_POINT exists, checking if it’s our sparse bundle"
+if [[ -d "$MOUNT_POINT" ]]; then
     if hdiutil info | grep -q "$SPARSE_BUNDLE" && hdiutil info | grep -q "$MOUNT_POINT"; then
-        echo "Debug: $MOUNT_POINT is already mounted correctly"
+        echo "$MOUNT_POINT is already mounted"
     else
-        echo "Error: $MOUNT_POINT exists but isn’t our sparse bundle"
-        exit 1
+        warn "Error: $MOUNT_POINT exists but isn't our sparse bundle"
     fi
 else
-    if ! echo -n "$PASSWORD" | hdiutil attach "$SPARSE_BUNDLE" -mountpoint "$MOUNT_POINT" -stdinpass -verbose 2>mount_error.log; then
-        echo "Error: Failed to mount sparse bundle"
-        cat mount_error.log
-        rm mount_error.log
-        exit 1
+    mount_err=$(mktemp)
+    if ! echo -n "$PASSWORD" | hdiutil attach "$SPARSE_BUNDLE" -mountpoint "$MOUNT_POINT" -stdinpass -verbose 2>"$mount_err"; then
+        cat "$mount_err" >&2
+        rm -f "$mount_err"
+        warn "Error: Failed to mount sparse bundle"
     fi
+    rm -f "$mount_err"
 fi
 
 if ! gitea-cli stop; then
-    echo "Error: Failed to stop Gitea"
     hdiutil detach "$MOUNT_POINT"
-    exit 1
+    warn "Error: Failed to stop Gitea"
 fi
 
 for FOLDER in "${FOLDERS[@]}"; do
     FULL_PATH=$(realpath "$FOLDER")
-    BASE_NAME=$(echo "$FULL_PATH" | sed "s|^$HOME\/|HOME|" | tr '/' '_')
-    TEMP_FILE="/tmp/$BASE_NAME-$(date +%Y%m%d_%H%M%S).7z"
+    BASE_NAME="${FULL_PATH/#"$HOME"\//HOME}"
+    BASE_NAME="${BASE_NAME//\//_}"
+    TEMP_FILE="/tmp/${BASE_NAME}-$(date +%Y%m%d_%H%M%S).7z"
     DEST_FOLDER="$MOUNT_POINT/$BASE_NAME"
-    # META_FILE="$MOUNT_POINT/$BASE_NAME-$(date +%Y%m%d_%H%M%S).txt"
 
-    if ! /opt/homebrew/bin/7z a -t7z -m0=lzma2 -mx=9 -mmt=on "$TEMP_FILE" "$FOLDER"; then
+    if ! 7z a -t7z -m0=lzma2 -mx=9 -mmt=on "$TEMP_FILE" "$FOLDER"; then
         echo "Error: Failed to compress $FOLDER, skipping"
         continue
     fi
 
-    if [ ! -f "$TEMP_FILE" ]; then
-        echo "Error: Temp file $TEMP_FILE not created, skipping"
-        continue
-    fi
+    [[ ! -f "$TEMP_FILE" ]] && echo "Error: Temp file not created, skipping" && continue
 
     echo "$FULL_PATH" >"$TEMP_FILE.txt"
 
-    if [ ! -d "$MOUNT_POINT" ]; then
-        echo "Error: Mount point $MOUNT_POINT not found, skipping"
-        continue
-    fi
+    [[ ! -d "$MOUNT_POINT" ]] && echo "Error: Mount point disappeared, skipping" && continue
 
     if ! rsync --archive --xattrs --acls --hard-links --progress "$TEMP_FILE" "$TEMP_FILE.txt" "$DEST_FOLDER"; then
-        echo "Error: rsync failed for $TEMP_FILE, skipping"
-        rm "$TEMP_FILE" "$TEMP_FILE.txt"
+        echo "Error: rsync failed for $FOLDER, skipping"
+        rm -f "$TEMP_FILE" "$TEMP_FILE.txt"
         continue
     fi
 
-    rm "$TEMP_FILE" "$TEMP_FILE.txt"
+    rm -f "$TEMP_FILE" "$TEMP_FILE.txt"
 done
 
 if ! hdiutil detach "$MOUNT_POINT"; then
-    echo "Warning: Failed to unmount sparse bundle"
-    exit 1
+    warn "Warning: Failed to unmount sparse bundle"
 fi
 
 if ! gitea-cli start; then
-    echo "Error: Backup succesfull but failed to start Gitea"
-    exit 1
+    warn "Error: Backup successful but failed to start Gitea"
 fi

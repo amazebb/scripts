@@ -1,105 +1,166 @@
 #!/usr/bin/env bash
 # Run shellcheck to identify script issues.
 
-# Help function
+# shellcheck disable=SC2016
+
 usage() {
-    echo "Usage: $(basename "$0") [directory] [options]"
-    echo "Arguments:"
-    echo "  directory  Directory to search for shell scripts (default: ~/.local/share/scripts/bin)"
-    echo "Options:"
-    echo "  -h    Display this help message"
-    echo "  -v    Verbose mode, show full shellcheck output"
-    echo "  -d    Max Depth (default: recurses)"
-    exit 0
+    cat <<EOF
+$(B NAME)
+    $(B check-scripts) - Run shellcheck on shell scripts in a directory
+
+$(B SYNOPSIS)
+    $(B "check-scripts [-h] [-v] [-d depth]") [$(U directory)]
+
+$(B DESCRIPTION)
+    Find shell scripts and run shellcheck to identify issues.
+    Results are displayed with pass/fail status per file.
+
+$(B OPTIONS)
+    $(B -h)        Show this help message
+
+    $(B -v)        Verbose mode, show full shellcheck output
+
+    $(B -d) $(U depth)  Max directory depth $(I '(default: recurses)')
+
+$(B EXAMPLES)
+    Check all scripts in the default directory
+
+        check-scripts
+
+    Check scripts in a specific directory with depth limit
+
+        check-scripts -d 1 ~/bin
+
+EOF
 }
+
+warn() {
+    if [ $# -ne 0 ]; then
+        printf "\033[31m%s\033[0m\n" "$1" >&2
+    fi
+    (($# < 2)) && exit 1 || ([[ "$2" == "-1" ]] && return 0) || exit "${2:-1}"
+}
+
+U() {
+    printf "%s" "$(tput smul)$1$(tput rmul)"
+}
+
+B() {
+    printf "%s" "$(tput bold)$1$(tput sgr0)"
+}
+
+I() {
+    printf "%s" "$(tput sitm)$1$(tput ritm)"
+}
+
+Q() {
+    read -p "$1 [y/n]: " -r
+    echo
+    if [[ ! $REPLY =~ [Yy] ]]; then
+        echo "Aborted."
+        exit 1
+    fi
+}
+
+ask() {
+    read -p "$1: " -r
+    echo "$REPLY"
+}
+
+argval() {
+    if (($# < 2)); then
+        warn "Error: $1 requires an argument"
+    fi
+    echo "$2"
+}
+
+# Check if shellcheck is installed
+if ! command -v shellcheck >/dev/null 2>&1; then
+    warn "Error: shellcheck is not installed. Please install it first."
+fi
 
 # Default values
 DIR=~/.local/share/scripts/bin/
 VERBOSE=false
+MAXDEPTH=""
 
-# Parse options with getopts
-while getopts "hvd:" opt; do
-    case "$opt" in
-    d) MAXDEPTH="$OPTARG" ;;
-    v) VERBOSE=true ;;
-    h) usage ;;
-    ?) usage ;;
+# Parse arguments
+while (($#)); do
+    case $1 in
+    -h) usage && exit 0 ;;
+    -d)
+        MAXDEPTH=$(argval "$@")
+        shift
+        ;;
+    -v) VERBOSE=true ;;
+    --)
+        shift
+        break
+        ;;
+    -*)
+        warn "Unknown option: $1"
+        ;;
+    *) break ;; # Positional arguments
     esac
+    shift
 done
 
-# Shift past the options
-shift $((OPTIND - 1))
-
-# If a directory is provided as an argument, use it
-if [ $# -gt 0 ]; then
+# If a directory is provided as a positional argument, use it
+if (($#)); then
     DIR="$1"
 fi
 
+Q "Run ShellCheck on $DIR"
+
 # Check if the directory exists
 if [ ! -d "$DIR" ]; then
-    echo "Error: Directory '$DIR' does not exist."
-    exit 1
-fi
-
-# Check if shellcheck is installed
-if ! command -v shellcheck >/dev/null 2>&1; then
-    echo "Error: shellcheck is not installed. Please install it first."
-    exit 1
+    warn "Error: Directory '$DIR' does not exist."
 fi
 
 # Initialize counters
 total_files=0
-files_with_issues=0
-files_without_issues=0
+issues=0
+ok=0
 
 # Collect files into an array
-# An explanation:
-# find ... -print0 outputs filenames separated by null bytes, which handles spaces, newlines, etc., safely.
-# while IFS= read -r -d '' file reads null-delimited input into the files array.
-# < <(...) (process substitution) avoids a subshell, the array is populated in the main shell
 files=()
-max_basename_length=0
+max_len=0
 while IFS= read -r -d '' file; do
     files+=("$file")
-    basename=$(basename "$file")
-    basename_length=${#basename}
-    if [ "$basename_length" -gt "$max_basename_length" ]; then
-        max_basename_length=$basename_length
-    fi
+    base=$(basename "$file")
+    len=${#base}
+    ((len > max_len)) && max_len=$len
 done < <(find "$DIR" -type f ${MAXDEPTH:+-maxdepth "$MAXDEPTH"} -print0)
 
 # Add some padding for safety (e.g., +2 for extra space)
-pad=$((max_basename_length + 2))
-
-dashed_line=$(printf "%-*s" "$(tput cols)" "" | tr ' ' '-')
+pad=$((max_len + 2))
+dash=$(printf "%-*s" "$(tput cols)" "" | tr ' ' '-')
 
 printf "Running ShellCheck on scripts in %s\n\n" "$DIR"
 
 # Iterate over the array
 for script in "${files[@]}"; do
-    total_files=$((total_files + 1))
+    ((total_files++))
     output=$(shellcheck "$script" 2>/dev/null)
     if [ -n "$output" ]; then
-        files_with_issues=$((files_with_issues + 1))
+        ((issues++))
         if [ "$VERBOSE" = "true" ]; then
-            printf "%s\n" "$dashed_line"
+            printf "%s\n" "$dash"
         fi
         printf "%-${pad}s" "$(basename "$script")"
         if [ "$VERBOSE" = "true" ]; then
-            printf "\n%s\n%s\n" "$dashed_line" "$output"
+            printf "\n%s\n%s\n" "$dash" "$output"
         else
             printf "\033[31m X\033[0m\n"
         fi
     else
-        files_without_issues=$((files_without_issues + 1))
+        ((ok++))
         if [ "$VERBOSE" = "false" ]; then
             printf "%-${pad}s OK\n" "$(basename "$script")"
         fi
     fi
 done
 
-# Display summary
 printf "\nSummary:\n"
 printf "Total files checked: %d\n" "$total_files"
-printf "Files with issues: %d\n" "$files_with_issues"
-printf "Files without issues: %d\n" "$files_without_issues"
+printf "Files with issues: %d\n" "$issues"

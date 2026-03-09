@@ -1,5 +1,5 @@
 #!/usr/bin/env dash
-# Preview files, directories for nnn.
+# Preview files, directories for nnn
 # Description: Minimal example to preview files and directories
 #              Automatically exits when the NNN_FIFO closes
 

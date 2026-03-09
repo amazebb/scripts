@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Backup photos from camera and organize into date folders
 
 usage() {
     (($#)) && echo "$1" >&2

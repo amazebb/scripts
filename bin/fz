@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# Search text interactively with ripgrep and fzf.
+# Search text interactively with ripgrep and fzf
 VERSION="1.0.0"
 
 # Help function

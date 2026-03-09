@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+# Find duplicate files and offer to create symlinks
 # shellcheck disable=SC2016
 
 usage() {

@@ -1,5 +1,5 @@
 #!/usr/bin/env dash
-# Launch nnn with preview in tmux.
+# Launch nnn with preview in tmux
 
 # Block nesting of nnn in subshells
 [ "${NNNLVL:-0}" -eq 0 ] || {

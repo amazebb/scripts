@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+# Pull latest neovim commit and build
 # shellcheck disable=SC2016
 
 usage() {

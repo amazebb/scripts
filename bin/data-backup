@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Backup folders to SPARSE image in iCloud.
+# Backup folders to SPARSE image in iCloud
 
 # shellcheck disable=SC2016
 

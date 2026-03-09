@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Pre-process PDFs, ZSDs for fz, ripgrep.
+# Pre-process PDFs, ZSDs for fz, ripgrep
 # https://github.com/BurntSushi/ripgrep/blob/master/GUIDE.md#configuration-file
 case "$1" in
 *.pdf)

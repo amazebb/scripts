@@ -1,28 +1,28 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 # List scripts with descriptions in $HOME/.local/share/scripts/bin
 
 # Directory to search for script
 DIR=${1:-$HOME/.local/share/scripts/bin}
 
 # Find all shell script files and process them
-A=(Name)
-B=(Shell)
-C=(Description)
+A=(NAME)
+B=(SHELL)
+C=(DESCRIPTION)
 
-find "$DIR" -type f ! -name "*.*" -depth 1 | sort -k1 | while read -r script; do
+while read -r script; do
     # Get the script name (basename removes the path)
-    A+=($(basename "$script"))
+    A+=("$(basename "$script")")
 
     # Determine script type from shebang (first line)
-    B+=($(head -n 1 "$script" | sed 's|^#\!/usr/bin/env ||'))
+    B+=("$(head -n 1 "$script" | sed 's|^#\!/usr/bin/env ||')")
 
     # Extract the first comment line that starts with # (ignoring shebang)
     desc=$(grep "^#[^!]" "$script" | head -n 1 | sed 's/^# *//')
 
     # If no description found, use a placeholder
     desc=${desc:-"No description"}
-    C+=($desc)
-done
+    C+=("$desc")
+done < <(find "$DIR" -type f ! -name "*.*" -depth 1 | sort -k1)
 
 paste <(printf '%s\n' "${A[@]}") \
     <(printf '%s\n' "${B[@]}") \

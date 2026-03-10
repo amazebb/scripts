@@ -62,19 +62,22 @@ function summary() {
         printf("\n")
     }
 
-    printf("Duplicate size: %.1f MiB\n", total / 1024 / 1024)
-    printf("Duplicate files: %d\n", total_dupes)
-    printf("Unique duplicates: %d\n", num_files)
-    printf("Number of symlink: %d\n", total_dupes - num_files)
+    if (total) {
+        printf("Duplicate size: %.1f MiB\n", total / 1024 / 1024)
+        printf("Duplicate files: %d\n", total_dupes)
+        printf("Unique duplicates: %d\n", num_files)
+        printf("Number of symlink: %d\n", total_dupes - num_files)
 
-    if (no_link_group && PREF_DUPE_DIR != "") {
-        printf(\
-            "\nCould not symlink:\nGroups: %d\nFiles: %d\nWasted: ",
-            no_link_group,
-            no_link_files\
-        )
-        pretty_bytes(no_link_wasted)
+        if (no_link_group && PREF_DUPE_DIR != "") {
+            printf(\
+                "\nCould not symlink:\nGroups: %d\nFiles: %d\nWasted: ",
+                no_link_group,
+                no_link_files\
+            )
+            pretty_bytes(no_link_wasted)
+        }
     }
+    else print "No duplicates found"
 }
 
 function pretty_bytes(sz) {

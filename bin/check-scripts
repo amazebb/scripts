@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Run shellcheck to identify script issues
+
 # shellcheck disable=SC2016
 
 usage() {

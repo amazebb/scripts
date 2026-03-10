@@ -1,143 +1,154 @@
-#!/usr/bin/env dash
+#!/usr/bin/env bash
 # Analyze disk usage by folder size
-# Usage: disk-usage [path1 path2 ...] [-e exclude1 exclude2 ...] [-d display_depth] [-D depth] [-a] [-v] [-r] [-h]
 
-# Defaults
-paths="."                      # Default to current folder
-excludes="--exclude=./.Trash*" # Default exclude
-display_depth=1                # Default display depth
-depth="all"                    # Default traverse all folders
-apparent_size=""               # Default to device usage
-verbose=0                      # Default verbose off
-recurse=0                      # Default: no recursive adjustment
+# shellcheck disable=SC2016
 
-# Help function
-show_help() {
-    script_name=$(basename "$0")
-    echo "Usage: $script_name [path1 path2 ...] [-e exclude1 exclude2 ...] [-d display_depth] [-D depth] [-a] [-v] [-h]"
-    echo "Summarizes disk usage for directories with configurable options"
-    echo "Options:"
-    echo "  path1 path2 ...  Directories to analyze (default: .)"
-    echo "  -e exclude...    Space-separated list of patterns to exclude (default: ./.Trash*)"
-    echo "  -d display_depth Depth to display paths (default: 1)"
-    echo "  -D depth         Depth to traverse (default: all, use number for specific depth)"
-    echo "  -a               Use apparent size instead of device usage"
-    echo "  -v               Show permission denied errors (default: off)"
-    echo "  -r               Adjust parent folders to show direct usage (subtract children), deepest level recursive"
-    echo "  -h               Show this help message"
-    echo "Examples:"
-    echo "  $script_name Desktop Downloads -D 1 -a      # Analyze Desktop and Downloads, depth 1, apparent size"
-    echo "  $script_name . -d 2 -e ./Lib* ./Trash* -v   # Current dir, display depth 2, exclude Lib and Trash, verbose"
-    exit 0
+warn() {
+    printf "\033[31m%s\033[0m\n" "$1" >&2
+    [ "${2-}" = -1 ] || exit 1
+}
+U() {
+    tput smul
+    printf '%s' "$*"
+    tput rmul
+}
+B() {
+    tput bold
+    printf '%s' "$*"
+    tput sgr0
+}
+I() {
+    tput sitm
+    printf '%s' "$*"
+    tput ritm
+}
+Q() {
+    printf '%s [y/N] ' "$1"
+    read -r ans
+    [ "$ans" = y ] || [ "$ans" = Y ] || exit 0
+}
+ask() {
+    printf '%s ' "$1"
+    read -r ans
+    echo "$ans"
+}
+argval() { [ $# -ge 2 ] && [ -n "$2" ] || warn "Option $1 requires a value"; }
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B disk-useage) - Analyze disk usage by folder size
+
+$(B SYNOPSIS)
+    $(B "disk-useage [-h] [-d depth] [-e pattern ...] [-v]") [$(U path) ...]
+
+$(B DESCRIPTION)
+    Summarizes disk usage for directories with configurable depth,
+    exclusion patterns, and color-coded size output.
+
+$(B OPTIONS)
+    $(B -h)              Show this help message
+
+    $(B -d) $(U depth)        Depth to traverse $(I '(default: 1)')
+
+    $(B -e) $(U pattern) ...  Space-separated list of patterns to exclude
+                    $(I '(default: .Trash*)')
+
+    $(B -v)              Show permission denied errors
+
+$(B EXAMPLES)
+    Analyze Desktop and Downloads at depth 1
+
+        disk-useage -d 1 Desktop Downloads
+
+    Current dir, depth 2, exclude Lib and Trash, verbose
+
+        disk-useage -d 2 -e ./Lib* ./Trash* -v
+
+EOF
 }
 
-# Collect paths until an option is encountered
-while [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; do
-    if [ "$paths" = "." ]; then
-        paths="$1"
-    else
-        paths="$paths $1"
-    fi
+# Defaults
+DIRS=()
+EX="--exclude=.Trash*"
+DEPTH="1"
+V=0
+
+while (($#)); do
+    case "$1" in
+    -h | -help | --help)
+        usage
+        exit 0
+        ;;
+    -d)
+        argval "$@"
+        DEPTH="$2"
+        shift
+        ;;
+    -e)
+        shift
+        EX=""
+        while (($#)) && [ "${1#-}" = "$1" ]; do
+            EX+=" --exclude=$1"
+            shift
+        done
+        continue
+        ;;
+    -v)
+        V=1
+        ;;
+    --)
+        shift
+        break
+        ;;
+    -*)
+        warn "Unknown option: $1"
+        ;;
+    *)
+        DIRS+=("$1")
+        ;;
+    esac
     shift
 done
 
-# Parse options
-while [ $# -gt 0 ]; do
-    case "$1" in
-    -e)
-        shift
-        excludes=""
-        while [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; do
-            excludes="$excludes --exclude=$1"
-            shift
-        done
-        ;;
-    -d)
-        display_depth="$2"
-        shift 2
-        ;;
-    -D)
-        depth="$2"
-        shift 2
-        ;;
-    -a)
-        apparent_size="--apparent-size"
-        shift
-        ;;
-    -v)
-        verbose=1
-        shift
-        ;;
-    -r)
-        recurse=1
-        shift
-        ;;
-    -h | -help | --help)
-        show_help
-        ;;
-    *)
-        echo "Unknown option: $1"
-        exit 1
-        ;;
-    esac
+# Remaining positional args after --
+while (($#)); do
+    DIRS+=("$1")
+    shift
 done
 
-# Handle depth argument
-if [ "$depth" = "all" ]; then
-    depth_arg=""
-else
-    depth_arg="-d $depth"
-fi
+# Default to current directory
+[ ${#DIRS[@]} -gt 0 ] || DIRS=(".")
 
 # Define colors
-white="\033[37m"
+white="\033[36m"
 red="\033[31m"
 green="\033[32m"
-orange="\033[38;5;208m" # True orange from 256-color palette
+orange="\033[38;5;208m"
 reset="\033[0m"
 
-# Run gdu with multiple paths, capture errors, pipe through grep, sed, grep, awk, sort
 temp_err=$(mktemp)
-gdu "$depth_arg" "$apparent_size" "$paths" "$excludes" 2>"$temp_err" |
-    grep -vE "^[0-9]+[[:space:]]+\.[[:space:]]*$" |
-    sed 's|\./||' |
-    grep -E "^[^/]*(/[^/]*){0,$((display_depth - 1))}$" |
-    awk -v dd="$display_depth" -v recurse="$recurse" '{
-        key = substr($0, index($0, $2));
-        sums[key] += $1;
-        if (recurse) {
-            n = split(key, parts, "/") - 1;
-            if (n > 0 && n < dd) {
-                parent = (n == 1) ? parts[1] : substr(key, 1, match(key, /\/[^/]*$/)-1);
-                children[parent] += $1;
-            }
-        }
-    } END {
-        for (k in sums) {
-            if (recurse && split(k, parts, "/") - 1 <= dd - 2 && children[k] > 0) {
-                sums[k] = (sums[k] > children[k]) ? sums[k] - children[k] : sums[k];
-            }
-            print sums[k], k;
-        }
-    }' |
-    sort -n -k 1 |
-    awk -v w="$white" -v r="$red" -v g="$green" -v o="$orange" -v rs="$reset" '{
-        size = $1;
-        path = substr($0, index($0, $2));
-        if (size < 1024) printf "%s%6.2fK%s %s\n", w, size, rs, path;
-        else if (size < 100*1024) printf "%s%6.2fM%s %s\n", o, size/1000, rs, path;
-        else if (size < 1000*1024) printf "%s%6.2fM%s %s\n", g, size/1000, rs, path;
-        else printf "%s%6.2fG%s %s\n", r, size/(1000*1000), rs, path;
-    }'
+trap 'rm -f "$temp_err"' EXIT
+
+for DIR in "${DIRS[@]}"; do
+    du ${DEPTH:+"-d $DEPTH"} ${EX:+"$EX"} "$DIR" 2>>"$temp_err"
+done |
+    sort -k1 -n |
+    awk -F'\t' -v w="$white" -v r="$red" -v g="$green" -v o="$orange" -v rs="$reset" \
+        ' $2 != "." {if ($1 < 1024) {t1+=$1; printf "%s%6.0f KiB%s %s\n", w, $1, rs, $2}
+    else if ($1 < 100*1024) {t2+=$1; printf "%s%6.2f MiB%s %s\n", o, $1/1024, rs, $2}
+    else if ($1 < 1024*1024) {t3+=$1; printf "%s%6.2f MiB%s %s\n", g, $1/1024, rs, $2}
+    else {t4+=$1; printf "%s%6.2f GiB%s %s\n", r, $1/1024/1024, rs, $2}}
+        END {print ""
+            print "Summary"
+            if (t1) printf "< 1 MiB:    %s%6.0f (MiB)%s\n", w, t1/1024, rs
+            if (t2) printf "< 100 MiB:  %s%6.2f (MiB)%s\n", o, t2/1024, rs
+            if (t3) printf "< 1 GiB:    %s%6.2f (GiB)%s\n", g, t3/1024/1024, rs
+            if (t4) printf ">=1 GiB:    %s%6.2f (GiB)%s\n", r, t4/1024/1024, rs}'
 
 # Error handling
 error_count=$(wc -l <"$temp_err")
-if [ "$error_count" -gt 0 ]; then
-    if [ "$verbose" -eq 1 ]; then
-        cat "$temp_err"
-    else
-        echo "Note: $error_count folders could not be read due to permissions"
-    fi
+if ((error_count > 0)); then
+    ((V)) && cat "$temp_err" >&2 ||
+        echo "Note: $error_count folders could not be read due to permissions" >&2
 fi
-
-rm -f "$temp_err"

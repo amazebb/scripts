@@ -42,6 +42,8 @@ argval() {
     # through all entered args.
 }
 
+noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
+
 usage() {
     cat <<EOF
 $(B NAME)
@@ -76,7 +78,7 @@ $(B EXAMPLES)
 EOF
 }
 
-((!$#)) && info "Error: no arguments provided" && usage && exit 1
+noargs $#
 
 typeset -A var
 var[-s]=''

@@ -40,6 +40,8 @@ argval() {
     # through all entered args.
 }
 
+noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
+
 usage() {
     (($#)) && echo "$1" >&2
 
@@ -89,7 +91,7 @@ EOF
     exit 0
 }
 
-((!$#)) && info "Error: no arguments provided" && usage && exit 1
+noargs $#
 
 typeset -A var
 var[-s]="by-date"

@@ -1,6 +1,5 @@
 #!/usr/bin/env zsh
 # Search text interactively with ripgrep and fzf
-VERSION="1.0.0"
 
 # Help function
 usage() {
@@ -11,17 +10,10 @@ usage() {
     Optional:
       -r        ripgrep option (e.g., \"-g '*.{pdf,zsd}'\")
       -h        Help
-      -v        Version
     Examples:
       fz \"-g '*.pdf'\" pattern   Search for 'pattern' in PDF files
       fz -- -g                    Search for literal '-g'
 EOF
-    exit 0
-}
-
-# Version function
-version() {
-    echo "$VERSION"
     exit 0
 }
 

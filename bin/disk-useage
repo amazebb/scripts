@@ -3,36 +3,44 @@
 
 # shellcheck disable=SC2016
 
-warn() {
-    printf "\033[31m%s\033[0m\n" "$1" >&2
-    [ "${2-}" = -1 ] || exit 1
-}
 U() {
     tput smul
     printf '%s' "$*"
     tput rmul
 }
+
 B() {
     tput bold
     printf '%s' "$*"
     tput sgr0
 }
+
 I() {
     tput sitm
     printf '%s' "$*"
     tput ritm
 }
+
 Q() {
-    printf '%s [y/N] ' "$1"
-    read -r ans
-    [ "$ans" = y ] || [ "$ans" = Y ] || exit 0
+    read -r -p "$1 [y/n]: "
+    [[ ! $REPLY =~ [Yy] ]] && echo "Aborted." && exit 1
 }
+
 ask() {
-    printf '%s ' "$1"
-    read -r ans
-    echo "$ans"
+    read -r -p "$1: "
+    echo "$REPLY"
 }
-argval() { [ $# -ge 2 ] && [ -n "$2" ] || warn "Option $1 requires a value"; }
+
+info() { printf "\033[31m%s\033[0m\n" "$1" >&2; }
+
+warn() { info "$1" && exit 1; }
+
+argval() {
+    (($# < 2)) || [[ $2 = -* ]] && warn "Error: $1 requires a valid argument" || echo "$2"
+    # NOTE Because 'warn' is called in a sub-shell, the exit 1 does not
+    # exit immediately. The parse arguments while loop will cycle
+    # through all entered args.
+}
 
 usage() {
     cat <<EOF

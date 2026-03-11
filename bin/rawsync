@@ -1,6 +1,45 @@
 #!/usr/bin/env bash
 # Backup photos from camera and organize into date folders
 
+U() {
+    tput smul
+    printf '%s' "$*"
+    tput rmul
+}
+
+B() {
+    tput bold
+    printf '%s' "$*"
+    tput sgr0
+}
+
+I() {
+    tput sitm
+    printf '%s' "$*"
+    tput ritm
+}
+
+Q() {
+    read -r -p "$1 [y/n]: "
+    [[ ! $REPLY =~ [Yy] ]] && echo "Aborted." && exit 1
+}
+
+ask() {
+    read -r -p "$1: "
+    echo "$REPLY"
+}
+
+info() { printf "\033[31m%s\033[0m\n" "$1" >&2; }
+
+warn() { info "$1" && exit 1; }
+
+argval() {
+    (($# < 2)) || [[ $2 = -* ]] && warn "Error: $1 requires a valid argument" || echo "$2"
+    # NOTE Because 'warn' is called in a sub-shell, the exit 1 does not
+    # exit immediately. The parse arguments while loop will cycle
+    # through all entered args.
+}
+
 usage() {
     (($#)) && echo "$1" >&2
 
@@ -50,35 +89,7 @@ EOF
     exit 0
 }
 
-U() {
-    printf "%s" "$(tput smul)$1$(tput rmul)"
-}
-
-B() {
-    printf "%s" "$(tput bold)$1$(tput sgr0)"
-}
-
-I() {
-    printf "%s" "$(tput sitm)$1$(tput ritm)"
-}
-
-((!$#)) && usage
-
-Q() {
-    read -p "$1 [y/N] " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Aborted."
-        exit 1
-    fi
-}
-
-argval() {
-    if (($# < 2)); then
-        usage "Error: $1 requires an argument"
-    fi
-    echo "$2"
-}
+((!$#)) && info "Error: no arguments provided" && usage && exit 1
 
 typeset -A var
 var[-s]="by-date"

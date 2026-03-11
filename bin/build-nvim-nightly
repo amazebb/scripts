@@ -2,6 +2,44 @@
 # Pull latest neovim commit and build
 
 # shellcheck disable=SC2016
+U() {
+    tput smul
+    printf '%s' "$*"
+    tput rmul
+}
+
+B() {
+    tput bold
+    printf '%s' "$*"
+    tput sgr0
+}
+
+I() {
+    tput sitm
+    printf '%s' "$*"
+    tput ritm
+}
+
+Q() {
+    read -r -p "$1 [y/n]: "
+    [[ ! $REPLY =~ [Yy] ]] && echo "Aborted." && exit 1
+}
+
+ask() {
+    read -r -p "$1: "
+    echo "$REPLY"
+}
+
+info() { printf "\033[31m%s\033[0m\n" "$1" >&2; }
+
+warn() { info "$1" && exit 1; }
+
+argval() {
+    (($# < 2)) || [[ $2 = -* ]] && warn "Error: $1 requires a valid argument" || echo "$2"
+    # NOTE Because 'warn' is called in a sub-shell, the exit 1 does not
+    # exit immediately. The parse arguments while loop will cycle
+    # through all entered args.
+}
 
 usage() {
     cat <<EOF
@@ -32,46 +70,6 @@ $(B EXAMPLES)
         build-nvim-nightly -r ~/src/neovim -d ~/.local/nvim-nightly
 
 EOF
-}
-
-warn() {
-    if [ $# -ne 0 ]; then
-        printf "\033[31m%s\033[0m\n" "$1" >&2
-    fi
-    (($# < 2)) && exit 1 || ([[ "$2" == "-1" ]] && return 0) || exit "${2:-1}"
-}
-
-U() {
-    printf "%s" "$(tput smul)$1$(tput rmul)"
-}
-
-B() {
-    printf "%s" "$(tput bold)$1$(tput sgr0)"
-}
-
-I() {
-    printf "%s" "$(tput sitm)$1$(tput ritm)"
-}
-
-Q() {
-    read -p "$1 [y/n]: " -r
-    echo
-    if [[ ! $REPLY =~ [Yy] ]]; then
-        echo "Aborted."
-        exit 1
-    fi
-}
-
-ask() {
-    read -p "$1: " -r
-    echo "$REPLY"
-}
-
-argval() {
-    if (($# < 2)); then
-        warn "Error: $1 requires an argument"
-    fi
-    echo "$2"
 }
 
 typeset -A var
@@ -105,6 +103,7 @@ NVIM_NIGHTLY="${var[-d]}"
 
 echo "$(B Repo):    $REPO"
 echo "$(B Install): $NVIM_NIGHTLY"
+echo "$(B Link):    $HOME/.local/bin"
 echo
 
 Q "Pull latest and build neovim nightly?"

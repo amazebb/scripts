@@ -91,6 +91,7 @@ while (($#)); do
     -h) usage && exit 0 ;;
     -e | -s | -w | -f)
         var["$1"]=$(argval "$@") || bad_arg=1
+        [[ "$1" == "-f" ]] && run_hash=false
         shift
         ;;
     --)
@@ -105,7 +106,6 @@ while (($#)); do
     shift
 done
 
-[[ "$1" == "-f" ]] && run_hash=false
 ((bad_arg)) && exit 1
 
 EXT="${var[-e]}"

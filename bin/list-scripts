@@ -1,20 +1,109 @@
 #!/usr/bin/env bash
 # List scripts with descriptions in $HOME/.local/share/scripts/bin
+U() {
+    tput smul
+    printf '%s' "$*"
+    tput rmul
+}
+
+B() {
+    tput bold
+    printf '%s' "$*"
+    tput sgr0
+}
+
+I() {
+    tput sitm
+    printf '%s' "$*"
+    tput ritm
+}
+
+Q() {
+    read -r -p "$1 [y/n]: "
+    [[ ! $REPLY =~ [Yy] ]] && echo "Aborted." && exit 1
+}
+
+info() { printf "\033[31m%s\033[0m\n" "$1" >&2; }
+
+warn() { info "$1" && exit 1; }
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B list-scripts) - List user scripts
+
+$(B SYNOPSIS)
+    $(B "list-scripts [-h] [-c]") [$(U script_directory)]
+
+$(B DESCRIPTION)
+    List scripts with description and optionally warn if there are issues
+    $(U script_directory) defaults to $(I \$HOME/.local/share/scripts/bin)
+
+$(B OPTIONS)
+    $(B -h) Show this help message
+
+    $(B -c) Check for any issues
+
+$(B EXAMPLES)
+    List all scripts and check for any issues
+
+        list-scripts -c
+
+EOF
+}
+
+CHECK=0
+
+# Parse arguments
+while (($#)); do
+    case $1 in
+    -h) usage && exit 0 ;;
+    -c)
+        CHECK=1
+        shift
+        ;;
+    --)
+        shift
+        break
+        ;;
+    -*)
+        warn "Unknown option: $1"
+        ;;
+    *) break ;; # Positional arguments
+    esac
+    shift
+done
 
 # Directory to search for script
 DIR=${1:-$HOME/.local/share/scripts/bin}
+
+Q "List scripts in $DIR"
 
 # Find all shell script files and process them
 A=(NAME)
 B=(SHELL)
 C=(DESCRIPTION)
+D=(STATUS)
+
+check_scripts() {
+    if [[ ! "$1" =~ \.[^/]*$ ]]; then
+        output=$(shellcheck "$1" 2>/dev/null)
+    elif [[ "$1" =~ \.awk ]]; then
+        output=$(gawk --lint -f "$1" </dev/null 2>&1 | grep -i warning)
+    fi
+    [[ -n "$output" ]] && echo "WARN" || echo " "
+}
 
 while read -r script; do
     # Get the script name (basename removes the path)
     A+=("$(basename "$script")")
 
-    # Determine script type from shebang (first line)
-    B+=("$(head -n 1 "$script" | sed 's|^#\!/usr/bin/env ||')")
+    if [[ "$script" =~ \.awk ]]; then
+        B+=(awk)
+    else
+        # Determine script type from shebang (first line)
+        B+=("$(head -n 1 "$script" | sed 's|^#\!/usr/bin/env ||')")
+    fi
 
     # Extract the first comment line that starts with # (ignoring shebang)
     desc=$(grep "^#[^!]" "$script" | head -n 1 | sed 's/^# *//')
@@ -22,8 +111,20 @@ while read -r script; do
     # If no description found, use a placeholder
     desc=${desc:-"No description"}
     C+=("$desc")
-done < <(find "$DIR" -type f ! -name "*.*" -depth 1 | sort -k1)
 
-paste <(printf '%s\n' "${A[@]}") \
-    <(printf '%s\n' "${B[@]}") \
-    <(printf '%s\n' "${C[@]}") | column -s $'\t' -t
+    if ((CHECK)); then
+        status=$(check_scripts "$script")
+        D+=("$status")
+    fi
+done < <(find "$DIR" -type f -depth 1 | sort -k1)
+
+if ((CHECK)); then
+    paste <(printf '%s\n' "${A[@]}") \
+        <(printf '%s\n' "${B[@]}") \
+        <(printf '%s\n' "${D[@]}") \
+        <(printf '%s\n' "${C[@]}") | column -s $'\t' -t
+else
+    paste <(printf '%s\n' "${A[@]}") \
+        <(printf '%s\n' "${B[@]}") \
+        <(printf '%s\n' "${C[@]}") | column -s $'\t' -t
+fi

@@ -136,12 +136,16 @@ done < <(find "$DIR" -type f ${MAXDEPTH:+-maxdepth "$MAXDEPTH"} -print0)
 pad=$((max_len + 2))
 dash=$(printf "%-*s" "$(tput cols)" "" | tr ' ' '-')
 
-printf "Running ShellCheck on scripts in %s\n\n" "$DIR"
-
 # Iterate over the array
 for script in "${files[@]}"; do
     ((total_files++))
-    output=$(shellcheck "$script" 2>/dev/null)
+
+    if [[ ! "$script" =~ \.[^/]*$ ]]; then
+        output=$(shellcheck "$script" 2>/dev/null)
+    elif [[ "$script" =~ \.awk ]]; then
+        output=$(gawk --lint -f "$script" </dev/null 2>&1 | grep -i warning)
+    fi
+
     if [ -n "$output" ]; then
         ((issues++))
         if [ "$VERBOSE" = "true" ]; then

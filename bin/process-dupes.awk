@@ -1,3 +1,4 @@
+# Process duplicate files found by dedupe
 function summary() {
     total = 0
     num_files = 0

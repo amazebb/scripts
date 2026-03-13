@@ -1,30 +1,31 @@
 # Interactive man page/tldr searcher with fzf, bat, and key bindings
 
+# shellcheck disable=SC2016
+
 fzf-man() {
-    cyan=$(tput setaf 6)
-    blue=$(tput setaf 4)
-    res=$(tput sgr0)
-    bld=$(tput bold)
-    color_awk='{ $1=cyan bld $1; $2=res blue $2; } 1'
-    esc_cyan=$(printf '%q' "$cyan")
-    esc_blue=$(printf '%q' "$blue")
-    esc_res=$(printf '%q' "$res")
-    esc_bld=$(printf '%q' "$bld")a
     manpage='echo {} |  awk -F"[()]" "{print \$2, \$1}" | xargs man'
     batman="$manpage | bat --style=plain --language=man --color always --theme auto:system"
     _fzf-man-reload | fzf -q "$1" --ansi --style full --tiebreak=begin \
-        --header 'alt-m:man, alt-t:TLDR' \
-        --prompt=' Man > ' \
-        --preview-window '50%,rounded,<50(up,85%,border-bottom)' \
+        --header 'alt-m: man(all), alt-(1-9): man(1-9), alt-t: tldr' \
+        --prompt='man > ' \
+        --preview-window '50%,wrap-word,<50(up,85%,border-bottom)' \
         --preview "$batman" \
         --bind "enter:execute($manpage)" \
-        --bind "alt-m:+reload(_fzf-man-reload)+change-preview(${batman})+change-prompt( Man > )" \
-        --bind "alt-t:+reload(tldr -l)+change-preview(tldr {1})+change-prompt(TLDR > )"
+        --bind "alt-m:+reload(_fzf-man-reload)+change-preview(${batman})+change-prompt(man > )" \
+        --bind "alt-1:+reload(_fzf-man-reload 1)+change-preview(${batman})+change-prompt(man(1) General Commands > )" \
+        --bind "alt-2:+reload(_fzf-man-reload 2)+change-preview(${batman})+change-prompt(man(2) System Calls > )" \
+        --bind "alt-3:+reload(_fzf-man-reload 3)+change-preview(${batman})+change-prompt(man(3) Library Functions > )" \
+        --bind "alt-4:+reload(_fzf-man-reload 4)+change-preview(${batman})+change-prompt(man(4) Kernel Interfaces > )" \
+        --bind "alt-5:+reload(_fzf-man-reload 5)+change-preview(${batman})+change-prompt(man(5) File Formats > )" \
+        --bind "alt-6:+reload(_fzf-man-reload 6)+change-preview(${batman})+change-prompt(man(6) Games > )" \
+        --bind "alt-7:+reload(_fzf-man-reload 7)+change-preview(${batman})+change-prompt(man(7) Misc Info > )" \
+        --bind "alt-8:+reload(_fzf-man-reload 8)+change-preview(${batman})+change-prompt(man(8) System Manager's > )" \
+        --bind "alt-9:+reload(_fzf-man-reload 9)+change-preview(${batman})+change-prompt(man(9) Kernel Developer's > )" \
+        --bind "alt-t:+reload(tldr -l)+change-preview(tldr {1})+change-prompt(tldr > )"
     if [[ $ZLE_STATE == *widget* ]]; then
         [[ -o zle ]] && zle reset-prompt
     fi
 }
-# --bind "alt-t:+reload(comm -12 <(tldr -l) <(man -k . | -F' - ' '!seen[$1]++ {print \$1}' | sort -u) | sort -r | awk -v cyan=${esc_cyan} -v blue=${esc_blue} -v res=${esc_res} -v bld=${esc_bld} '${color_awk}')+change-preview(tldr -C {1})+change-prompt(TLDR > )"
 
 # Register the widget
 zle -N fzf-man

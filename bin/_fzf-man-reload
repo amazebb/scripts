@@ -4,5 +4,8 @@ cyan=$(tput setaf 6)
 blue=$(tput setaf 4)
 res=$(tput sgr0)
 bld=$(tput bold)
-color_awk='{ $1=cyan bld $1; $2=res blue $2; } 1'
-man -k . | awk -F' - ' '!seen[$1]++' | sort -r | awk -v cyan="$cyan" -v blue="$blue" -v res="$res" -v bld="$bld" "$color_awk"
+
+{ (($#)) && apropos -s "$1" . || man -k .; } |
+    awk -F' - ' '!seen[$1]++' |
+    sort -r |
+    awk -v cyan="$cyan" -v blue="$blue" -v res="$res" -v bld="$bld" '{ $1=cyan bld $1; $2=res blue $2; } 1'

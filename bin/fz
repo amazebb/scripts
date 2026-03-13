@@ -1,44 +1,120 @@
 #!/usr/bin/env zsh
 # Search text interactively with ripgrep and fzf
 
-# Help function
+# shellcheck disable=SC2016
+
+U() {
+    tput smul
+    printf '%s' "$*"
+    tput rmul
+}
+
+B() {
+    tput bold
+    printf '%s' "$*"
+    tput sgr0
+}
+
+I() {
+    tput sitm
+    printf '%s' "$*"
+    tput ritm
+}
+
+Q() {
+    read -r -p "$1 [y/n]: "
+    [[ ! $REPLY =~ [Yy] ]] && echo "Aborted." && exit 1
+}
+
+ask() {
+    read -r -p "$1: "
+    echo "$REPLY"
+}
+
+info() { printf "\033[31m%s\033[0m\n" "$1" >&2; }
+
+warn() { info "$1" && exit 1; }
+
+argval() {
+    (($# < 2)) || [[ $2 = -* ]] && warn "Error: $1 requires a valid argument" || echo "$2"
+    # NOTE Because 'warn' is called in a sub-shell, the exit 1 does not
+    # exit immediately. The parse arguments while loop will cycle
+    # through all entered args.
+}
+
+noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
+
 usage() {
     cat <<EOF
-    Usage: fz [OPTIONAL] pattern
-    Arguments:
-      pattern   Search pattern
-    Optional:
-      -r        ripgrep option (e.g., \"-g '*.{pdf,zsd}'\")
-      -h        Help
-    Examples:
-      fz \"-g '*.pdf'\" pattern   Search for 'pattern' in PDF files
-      fz -- -g                    Search for literal '-g'
+$(B NAME)
+    $(B fz) - Search text interactively with ripgrep and fzf
+
+$(B SYNOPSIS)
+    $(B "fz [-h] [-r option]") $(U pattern)
+
+$(B DESCRIPTION)
+    Interactive text search across configured directories using ripgrep
+    for searching and fzf for filtering. Supports switching between
+    ripgrep and fzf filtering modes, opening results in nvim, and
+    building quickfix lists from multiple selections.
+
+$(B OPTIONS)
+    $(B -h)          Show this help message
+
+    $(B -r) $(U option)   Additional ripgrep option $(I '(e.g., "-g *.pdf")')
+
+$(B KEYBINDINGS)
+    $(B CTRL-T)      Switch between ripgrep and fzf filtering
+    $(B ALT-A)       Select all results
+    $(B ALT-D)       Deselect all results
+    $(B CTRL-P)      Toggle preview pane
+    $(B ENTER)       Open in nvim (single selection) or quickfix (multi)
+    $(B CTRL-O)      Open in nvim without closing fzf
+
+$(B EXAMPLES)
+    Search for 'pattern' in all configured directories
+
+        fz pattern
+
+    Search for 'pattern' only in PDF files
+
+        fz -r "-g '*.pdf'" pattern
+
+    Search for a literal '-g'
+
+        fz -- -g
+
 EOF
-    exit 0
 }
+
+noargs $#
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 PRE_RG=(--pre $SCRIPT_DIR/pre-rg --pre-glob '*.{pdf}')
 
-# Parse optional arguments with getopts
-while getopts "hvr:" opt; do
-    case "$opt" in
-    h) usage ;;
-    v) version ;;
-    r) PRE_RG="$PRE_RG $OPTARG" ;;
-    ?) usage ;;
+# Parse arguments
+while (($#)); do
+    case $1 in
+    -h) usage && exit 0 ;;
+    -r)
+        PRE_RG+=("$(argval "$@")") || true
+        shift
+        ;;
+    --)
+        shift
+        break
+        ;;
+    -*)
+        warn "Unknown option: $1"
+        ;;
+    *) break ;;
     esac
+    shift
 done
-# Shift past the options
-shift $((OPTIND - 1))
 
-# Check required positional inputs
-(($# < 1)) && {
-    echo "Error: Missing pattern" >&2
-    usage
-}
+[[ -z "$1" ]] && warn "Error: missing pattern"
+PATTERN="$1"
 
-PATTERN=$1
 FOLDERS=(~ ~/.local/share/scripts ~/.local/share/zsh/site-functions/dotfiles ~/.local/share/zsh-prompt)
 OPTS=(--hidden --column --line-number --no-heading --color=always --smart-case)
 
@@ -47,7 +123,6 @@ export _FZ_PRE_RG_STR="${(j:\0:)PRE_RG}"
 export _FZ_OPTS_STR="${(j:\0:)OPTS}"
 export _FZ_GIT_TRACKED="true"
 
-# In your script before fzf
 rg_search() {
     local folders=(${(s:\0:)_FZ_FOLDERS_STR})
     local pre_rg=(${(s:\0:)_FZ_PRE_RG_STR})
@@ -63,9 +138,9 @@ rg_search() {
 }
 
 RELOAD="reload:$(typeset -f rg_search); rg_search {q}"
-OPENER='(( FZF_SELECT_COUNT == 0 )) && nvim {1} +{2} || nvim +cw -q {+f}' # Build quickfix list for the selected items.
+OPENER='(( FZF_SELECT_COUNT == 0 )) && nvim {1} +{2} || nvim +cw -q {+f}'
 BAT_OPTS='--theme=TwoDark --style=full --wrap=character --color=always --highlight-line {2}'
-PREVIEW='case {1} in *.pdf) ~/.local/bin/pre-rg {1} | nl -ba -w1 -s" " | bat $BAT_OPTS ;; *) bat $BAT_OPTS {1} ;; esac'
+PREVIEW='case {1} in *.pdf) ~/.local/bin/pre-rg {1} | nl -ba -w1 -s" " | bat '"$BAT_OPTS"' ;; *) bat '"$BAT_OPTS"' {1} ;; esac'
 
 fzf --disabled --ansi --multi \
     --bind "start:$RELOAD" --bind "change:$RELOAD" \
@@ -77,7 +152,7 @@ fzf --disabled --ansi --multi \
       echo "unbind(change)+change-prompt(2. fzf> )+enable-search+transform-query:echo \{q} > /tmp/rg-fzf-r; cat /tmp/rg-fzf-f"' \
     --prompt '1. ripgrep> ' \
     --delimiter : \
-    --header 'CTRL-T: Switch between ripgrep/fzf 
+    --header 'CTRL-T: Switch between ripgrep/fzf
 ALT-A: Select-all, ALT-D: Deselect-all, CTRL-P: Toggle-preview' \
     --style full \
     --layout=reverse-list \

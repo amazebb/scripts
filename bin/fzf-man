@@ -1,4 +1,3 @@
-#!/usr/bin/env zsh
 # Interactive man page/tldr searcher with fzf, bat, and key bindings
 
 fzf-man() {
@@ -10,29 +9,29 @@ fzf-man() {
     esc_cyan=$(printf '%q' "$cyan")
     esc_blue=$(printf '%q' "$blue")
     esc_res=$(printf '%q' "$res")
-    esc_bld=$(printf '%q' "$bld")
-    manpage="echo {} | sed 's/\\([[:alnum:][:punct:]]*\\) (\\([[:alnum:]]*\\)).*/\\2 \\1/'"
-    batman="${manpage} | xargs -r man | col -bx | bat --language=man --plain --color always --theme=\"Monokai Extended\""
-    man -k . | sort -r | awk -v cyan="$cyan" -v blue="$blue" -v res="$res" -v bld="$bld" "$color_awk" |
-        fzf \
-            -q "$1" \
-            --ansi \
-            --style full \
-            --header 'alt-m:man, alt-t:TLDR (common)' \
-            --tiebreak=begin \
-            --prompt=' Man > ' \
-            --preview-window '50%,rounded,<50(up,85%,border-bottom)' \
-            --preview "${batman}" \
-            --bind "enter:execute(${manpage} | xargs -r man)" \
-            --bind "alt-m:+reload(man -k . | sort -r | awk -v cyan=${esc_cyan} -v blue=${esc_blue} -v res=${esc_res} -v bld=${esc_bld} '${color_awk}')+change-preview(${batman})+change-prompt( Man > )" \
-            --bind "alt-t:+reload(comm -12 <(tldr -l -p osx | sed '1d' | sort) <(man -k . | awk '{print \$1}' | sort -u) | sort -r | awk -v cyan=${esc_cyan} -v blue=${esc_blue} -v res=${esc_res} -v bld=${esc_bld} '${color_awk}')+change-preview(tldr -C {1} -p osx)+change-prompt(TLDR > )"
+    esc_bld=$(printf '%q' "$bld")a
+    manpage='echo {} |  awk -F"[()]" "{print \$2, \$1}" | xargs man'
+    batman="$manpage | bat --style=plain --language=man --color always --theme auto:system"
+    _fzf-man-reload | fzf -q "$1" --ansi --style full --tiebreak=begin \
+        --header 'alt-m:man, alt-t:TLDR' \
+        --prompt=' Man > ' \
+        --preview-window '50%,rounded,<50(up,85%,border-bottom)' \
+        --preview "$batman" \
+        --bind "enter:execute($manpage)" \
+        --bind "alt-m:+reload(_fzf-man-reload)+change-preview(${batman})+change-prompt( Man > )" \
+        --bind "alt-t:+reload(tldr -l)+change-preview(tldr {1})+change-prompt(TLDR > )"
     if [[ $ZLE_STATE == *widget* ]]; then
         [[ -o zle ]] && zle reset-prompt
     fi
 }
+# --bind "alt-t:+reload(comm -12 <(tldr -l) <(man -k . | -F' - ' '!seen[$1]++ {print \$1}' | sort -u) | sort -r | awk -v cyan=${esc_cyan} -v blue=${esc_blue} -v res=${esc_res} -v bld=${esc_bld} '${color_awk}')+change-preview(tldr -C {1})+change-prompt(TLDR > )"
 
 # Register the widget
 zle -N fzf-man
 
 # Bind Ctrl-H to launch the fzf-man widget
 bindkey '^h' fzf-man
+
+# # GNU vs BSD
+# diff <(man -M /opt/homebrew/Cellar/coreutils/9.10/libexec/gnuman cat) \
+#      <(man -M /usr/share/man cat)

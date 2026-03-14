@@ -1,17 +1,77 @@
 #!/usr/bin/env bash
-# Plot function for Kitty terminal using gnuplot and kitten icat
+# shellcheck disable=SC2016
 
-iplot() {
-    cat <<EOF | gnuplot
-    set terminal pngcairo enhanced font 'Fira Sans,10'
-    set autoscale
-    set samples 1000
-    set output '|kitten icat --stdin yes'
-    set object 1 rectangle from screen 0,0 to screen 1,1 fillcolor rgb"#fdf6e3" behind
-    plot $@
-    set output '/dev/null'
+U() {
+    tput smul
+    printf '%s' "$*"
+    tput rmul
+}
+
+B() {
+    tput bold
+    printf '%s' "$*"
+    tput sgr0
+}
+
+I() {
+    tput sitm
+    printf '%s' "$*"
+    tput ritm
+}
+
+info() { printf "\033[31m%s\033[0m\n" "$1" >&2; }
+
+warn() { info "$1" && exit 1; }
+
+noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B iplot) - Plot functions in the Kitty terminal using gnuplot
+
+$(B SYNOPSIS)
+    $(B "iplot [-h]") $(U expression) ...
+
+$(B DESCRIPTION)
+    Renders gnuplot expressions inline in the Kitty terminal using
+    kitten icat. Multiple expressions can be plotted together.
+
+$(B OPTIONS)
+    $(B -h)        Show this help message
+
+$(B EXAMPLES)
+    Plot a sine wave
+
+        iplot "sin(x)"
+
+    Plot multiple functions
+
+        iplot 'sin(x) title "sin"' , 'cos(x) title "cos"'
+
 EOF
 }
 
-# Execute the function with provided arguments
-iplot "$@"
+while (($#)); do
+    case $1 in
+        -h) usage; exit 0 ;;
+        --) shift; break ;;
+        -*) warn "Unknown option: $1" ;;
+        *) break ;;
+    esac
+    shift
+done
+
+noargs $#
+
+plot_expr="$*"
+
+gnuplot <<EOF
+set terminal pngcairo enhanced font 'Fira Sans,10'
+set autoscale
+set samples 1000
+set output '|kitten icat --stdin yes'
+set object 1 rectangle from screen 0,0 to screen 1,1 fillcolor rgb"#fdf6e3" behind
+plot ${plot_expr}
+set output '/dev/null'
+EOF

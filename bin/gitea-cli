@@ -1,34 +1,88 @@
-#!/usr/bin/env dash
+#!/usr/bin/env bash
+# shellcheck disable=SC2016
 # Manage Gitea: start, stop, status, logs.
 
-# Help message
-show_help() {
-    script_name=$(basename "$0")
-    echo "Usage: $script_name [OPTION]"
-    echo "Manage Gitea server operations."
-    echo
-    echo "Options:"
-    echo "  start       Start the Gitea server"
-    echo "  stop        Stop the Gitea server"
-    echo "  status      Show the Gitea running status"
-    echo "  log         Show Gitea server logs"
-    echo "  -h, --help  Display this help message"
+U() {
+    tput smul
+    printf '%s' "$*"
+    tput rmul
+}
+
+B() {
+    tput bold
+    printf '%s' "$*"
+    tput sgr0
+}
+
+I() {
+    tput sitm
+    printf '%s' "$*"
+    tput ritm
+}
+
+Q() {
+    read -r -p "$1 [y/n]: "
+    [[ ! $REPLY =~ [Yy] ]] && echo "Aborted." && exit 1
+}
+
+ask() {
+    read -r -p "$1: "
+    echo "$REPLY"
+}
+
+info() { printf "\033[31m%s\033[0m\n" "$1" >&2; }
+
+warn() { info "$1" && exit 1; }
+
+argval() {
+    (($# < 2)) || [[ $2 = -* ]] && warn "Error: $1 requires a valid argument" || echo "$2"
+}
+
+noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B gitea-cli) - Manage Gitea server operations
+
+$(B SYNOPSIS)
+    $(B "gitea-cli [-h]") $(U command)
+
+$(B DESCRIPTION)
+    Start, stop, check status, and view logs for a local Gitea server.
+
+$(B COMMANDS)
+    $(B start)     Start the Gitea server and open in Safari
+    $(B stop)      Stop the Gitea server
+    $(B status)    Show the Gitea running status
+    $(B log)       Show Gitea server logs
+
+$(B OPTIONS)
+    $(B -h)        Show this help message
+
+$(B EXAMPLES)
+    Start the server
+
+        gitea-cli start
+
+    View live logs
+
+        gitea-cli log
+
+EOF
 }
 
 start_gitea() {
-    # printf "\033]0;Gitea\007"  # Set tab title to "Gitea"
     if pgrep -f "gitea web" >/dev/null; then
         echo "Gitea is already running."
     else
-        gitea web --config ~/.gitea-data/custom/conf/app.ini & # Start Gitea in background
-        # GITEA_PID=$!  # Capture PID
-        until curl -s http://localhost:3000 >/dev/null; do # Wait until Gitea responds
+        gitea web --config ~/.gitea-data/custom/conf/app.ini &
+        until curl -s http://localhost:3000 >/dev/null; do
             sleep 1
         done
         echo "Gitea started."
     fi
-    open -a Safari http://localhost:3000 # Open Safari regardless
-    # wait $GITEA_PID 2>/dev/null || true  # Wait on PID if started, ignore if not
+    open -a Safari http://localhost:3000
 }
 
 stop_gitea() {
@@ -54,32 +108,17 @@ status_gitea() {
     fi
 }
 
-# Check if no arguments are provided
-if [ $# -eq 0 ]; then
-    show_help
-    exit 0
-fi
+noargs $#
 
-# Process arguments
-case "$1" in
-start)
-    start_gitea
-    ;;
-stop)
-    stop_gitea
-    ;;
-status)
-    status_gitea
-    ;;
-log)
-    show_logs
-    ;;
--h | --help | -help)
-    show_help
-    ;;
-*)
-    echo "Error: Unknown option '$1'"
-    show_help
-    exit 1
-    ;;
-esac
+while (($#)); do
+    case "$1" in
+    start) start_gitea ;;
+    stop) stop_gitea ;;
+    status) status_gitea ;;
+    log) show_logs ;;
+    -h | --help) usage && exit 0 ;;
+    --) shift && break ;;
+    *) warn "Unknown option: $1" ;;
+    esac
+    shift
+done

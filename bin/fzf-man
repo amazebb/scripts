@@ -2,6 +2,7 @@
 
 # shellcheck disable=SC2016
 
+# TODO consider adding GNI info, eg: `info coreutils "$1" invocation 2>/dev/null`
 fzf-man() {
     manpage='echo {} |  awk -F"[()]" "{print \$2, \$1}" | xargs man'
     batman="$manpage | bat --style=plain --language=man --color always --theme auto:system"

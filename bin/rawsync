@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Backup photos from camera and organize into date folders
 
+# shellcheck disable=SC2016
+
 U() {
     tput smul
     printf '%s' "$*"
@@ -43,8 +45,6 @@ argval() {
 noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
 
 usage() {
-    (($#)) && echo "$1" >&2
-
     cat <<EOF
 $(B NAME)
     $(B rawsync) - Backup photos from camera and organize into date folders
@@ -88,12 +88,11 @@ $(B EXAMPLES)
         rawsync -e '*.CR3' "/Volumes/PHOTOS/RAW"
 
 EOF
-    exit 0
 }
 
 noargs $#
 
-typeset -A var
+declare -A var
 var[-s]="by-date"
 var[-d]="1970-01-01"
 var[-f]="%Y/%Y%m%d"
@@ -102,7 +101,7 @@ var[-e]='*.ARW'
 # Parse arguments
 while (($#)); do
     case $1 in
-    -h) usage ;;
+    -h) usage && exit 0 ;;
     -d | -e | -f | -s)
         var["$1"]=$(argval "$@")
         shift
@@ -112,7 +111,7 @@ while (($#)); do
         break
         ;;
     -*)
-        usage "Unknown option: $1"
+        warn "Unknown option: $1"
         ;;
     *) break ;; # Positional arguments
     esac
@@ -125,22 +124,24 @@ DATE_FMT="${var[-f]}"
 SYM="${var[-s]}"
 
 if ((!$#)); then
-    usage "Error: source_directory required"
+    warn "Error: source_directory required"
 fi
 
 SRC_DIR="$1"
 shift
 
 if (($#)); then
+    command -v rsync >/dev/null || warn "rsync not found"
+
     TARGET="$1"
     shift
     TARGET_ROOT=$(echo "$TARGET" | cut -d'/' -f1-3)
 
-    list=$(rsync -nia "$SRC_DIR" "$TARGET" 2>"$TARGET_ROOT/rsync_$(date +%Y%m%dT%H%M%S).log")
+    list=$(rsync -nia "$SRC_DIR" "$TARGET" 2>&1) || warn "$list"
     num_copy=$(echo "$list" | grep -c '^>f+')
-    num_modify=$(echo "$list" | grep -c '^\.d')
+    num_meta=$(echo "$list" | grep -c '^\.d')
 
-    Q "Backup from $SRC_DIR to $TARGET: ($num_copy copies, $num_modify modified)"
+    Q "Backup from $SRC_DIR to $TARGET: ($num_copy copies, $num_meta folder meta changes)"
     rsync -avhP "$SRC_DIR" "$TARGET" 2>"$TARGET_ROOT/rsync_$(date +%Y%m%dT%H%M%S).log"
 else
     TARGET_ROOT=$(echo "$SRC_DIR" | cut -d'/' -f1-3)
@@ -149,16 +150,23 @@ fi
 num=$(find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" 2>/dev/null | wc -l)
 ((!num)) && warn "No files found in $SRC_DIR"
 
+command -v grealpath >/dev/null || warn "GNU coreutils grealpath is needed 'brew install coreutils'"
+command -v exiftool >/dev/null || warn "exiftool not found"
 Q "Create $num symlinks in $TARGET_ROOT/$SYM from $SRC_DIR"
 
-# shellcheck disable=SC2016
-find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" -print0 |
-    xargs -0 exiftool -fast2 \
-        -printFormat '$Directory/$FileName|$DateTimeOriginal' \
-        -dateFormat "$DATE_FMT" |
-    while IFS='|' read -r src date; do
-        target_dir="$TARGET_ROOT/$SYM/$date"
-        mkdir -p "$target_dir"
-        src_file=$(realpath --relative-to="$target_dir" "$src")
-        ln -sf "$src_file" "$target_dir/" 2>/dev/null
-    done
+failed=0
+while IFS='|' read -r src date; do
+    target_dir="$TARGET_ROOT/$SYM/$date"
+    mkdir -p "$target_dir"
+    src_file=$(grealpath --relative-to="$target_dir" "$src")
+    if ! ln -sf "$src_file" "$target_dir/"; then
+        ((failed++))
+    fi
+done < <(
+    find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" -print0 |
+        xargs -0 exiftool -fast2 \
+            -printFormat '$Directory/$FileName|$DateTimeOriginal' \
+            -dateFormat "$DATE_FMT"
+)
+
+((failed)) && info "$failed symlinks failed to create"

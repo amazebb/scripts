@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2016
+
+U() {
+    tput smul
+    printf '%s' "$*"
+    tput rmul
+}
+
+B() {
+    tput bold
+    printf '%s' "$*"
+    tput sgr0
+}
+
+I() {
+    tput sitm
+    printf '%s' "$*"
+    tput ritm
+}
+
+Q() {
+    read -r -p "$1 [y/n]: "
+    [[ ! $REPLY =~ [Yy] ]] && echo "Aborted." && exit 1
+}
+
+ask() {
+    read -r -p "$1: "
+    echo "$REPLY"
+}
+
+info() { printf "\033[31m%s\033[0m\n" "$1" >&2; }
+
+warn() { info "$1" && exit 1; }
+
+argval() {
+    (($# < 2)) || [[ $2 = -* ]] && warn "Error: $1 requires a valid argument" || echo "$2"
+    # NOTE Because 'warn' is called in a sub-shell, the exit 1 does not
+    # exit immediately. The parse arguments while loop will cycle
+    # through all entered args.
+}
+
+noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B organise-by-date) - Organise files into date-based directories using EXIF metadata
+
+$(B SYNOPSIS)
+    $(B "organise-by-date [-h] [-n] [-d fmt]") $(U source_dir) [$(U dest_root)]
+
+$(B DESCRIPTION)
+    Scans $(U source_dir) recursively with exiftool, extracts DateTimeOriginal
+    from each file, and moves (or previews) files into a $(I YYYY/YYYYMMDD)
+    directory tree under $(U dest_root).
+
+    Files without date metadata are skipped. Name collisions are resolved
+    by appending a numeric suffix.
+
+$(B OPTIONS)
+    $(B -h)        Show this help message
+
+    $(B -n)        Dry run — show what would be moved without moving
+
+    $(B -d) $(U fmt)   Date format for directory structure $(I '(default: %Y/%Y%m%d)')
+
+$(B EXAMPLES)
+    Preview what would happen
+
+        organise-by-date -n /Volumes/SD/DCIM
+
+    Move files into a custom destination
+
+        organise-by-date /Volumes/SD/DCIM /Photos/Sorted
+
+    Use a flat year-month directory structure
+
+        organise-by-date -d '%Y-%m' /Volumes/SD/DCIM
+
+EOF
+}
+
+noargs $#
+
+DRY_RUN=false
+DATE_FMT='%Y/%Y%m%d'
+
+while (($#)); do
+    case "$1" in
+    -h) usage && exit 0 ;;
+    -n) DRY_RUN=true ;;
+    -d) DATE_FMT=$(argval "$@") && shift ;;
+    --)
+        shift
+        break
+        ;;
+    -*) warn "Unknown option: $1" ;;
+    *) break ;;
+    esac
+    shift
+done
+
+SRC="${1:-}"
+[[ -z "$SRC" ]] && warn "Error: source directory is required"
+[[ ! -d "$SRC" ]] && warn "Error: '$SRC' is not a directory"
+DEST="${2:-./NEW}"
+
+command -v exiftool &>/dev/null || warn "exiftool not found. Install with: $(I brew install exiftool)"
+
+CACHE="./exif_cache.txt"
+
+echo "Scanning with exiftool ..."
+exiftool -fast2 -recurse \
+    -printFormat '$Directory/$FileName|$DateTimeOriginal' \
+    -dateFormat "$DATE_FMT" \
+    "$SRC" 2>/dev/null >"$CACHE" || true
+total=$(wc -l <"$CACHE")
+echo "Scan complete. ${total} files with date metadata found."
+
+moved=0
+skipped=0
+collisions=0
+
+while IFS='|' read -r file date_path; do
+    # Skip empty/malformed lines
+    if [[ -z "$date_path" || "$date_path" != */* ]]; then
+        ((skipped++))
+        continue
+    fi
+
+    target_dir="${DEST}/${date_path}"
+    basename=$(basename "$file")
+    target="${target_dir}/${basename}"
+
+    # Handle name collisions
+    if [[ -e "$target" ]]; then
+        ((collisions++))
+        ext="${basename##*.}"
+        name="${basename%.*}"
+        i=1
+        while [[ -e "${target_dir}/${name}_${i}.${ext}" ]]; do
+            ((i++))
+        done
+        target="${target_dir}/${name}_${i}.${ext}"
+    fi
+
+    if $DRY_RUN; then
+        echo "[dry-run] $file -> $target"
+    else
+        mkdir -p "$target_dir"
+        mv -- "$file" "$target"
+    fi
+    ((moved++))
+done <"$CACHE"
+
+echo "Done. Moved: ${moved}, Skipped (no date): ${skipped}, Name collisions: ${collisions}"
+$DRY_RUN && echo "(dry run — no files were moved)"

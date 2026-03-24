@@ -121,6 +121,7 @@ for link in "${broken[@]}"; do
     match=$(find "$SOURCE" -type f -name "$name" -print -quit)
 
     if [[ -n "$match" ]]; then
+        match=$(realpath "$match")
         matches+=("$link|$match")
         if $DRY_RUN; then
             echo "[dry-run] $link -> $match"

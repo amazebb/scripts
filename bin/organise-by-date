@@ -53,7 +53,7 @@ $(B SYNOPSIS)
 $(B DESCRIPTION)
     Scans $(U source_dir) recursively with exiftool, extracts DateTimeOriginal
     from each file, and moves (or previews) files into a $(I YYYY/YYYYMMDD)
-    directory tree under $(U dest).
+    directory tree under $(U dest) $(I '(default: ./by-date)').
 
     Files without date metadata are skipped. Name collisions are resolved
     by appending a numeric suffix.
@@ -63,7 +63,7 @@ $(B OPTIONS)
 
     $(B -n)        Dry run — show what would be moved without moving
 
-    $(B -d) $(U fmt)   Date format for directory structure $(I '(default: %Y/%Y%m%d)')
+    $(B -d) $(U fmt)    Date format for directory structure $(I '(default: %Y/%Y%m%d)')
 
 $(B EXAMPLES)
     Preview what would happen

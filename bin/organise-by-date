@@ -48,12 +48,12 @@ $(B NAME)
     $(B organise-by-date) - Organise files into date-based directories using EXIF metadata
 
 $(B SYNOPSIS)
-    $(B "organise-by-date [-h] [-n] [-d fmt]") $(U source_dir) [$(U dest_root)]
+    $(B "organise-by-date [-h] [-n] [-d fmt]") $(U source_dir) [$(U dest)]
 
 $(B DESCRIPTION)
     Scans $(U source_dir) recursively with exiftool, extracts DateTimeOriginal
     from each file, and moves (or previews) files into a $(I YYYY/YYYYMMDD)
-    directory tree under $(U dest_root).
+    directory tree under $(U dest).
 
     Files without date metadata are skipped. Name collisions are resolved
     by appending a numeric suffix.
@@ -85,7 +85,6 @@ noargs $#
 
 DRY_RUN=false
 DATE_FMT='%Y/%Y%m%d'
-
 while (($#)); do
     case "$1" in
     -h) usage && exit 0 ;;
@@ -104,7 +103,7 @@ done
 SRC="${1:-}"
 [[ -z "$SRC" ]] && warn "Error: source directory is required"
 [[ ! -d "$SRC" ]] && warn "Error: '$SRC' is not a directory"
-DEST="${2:-./NEW}"
+DEST="${2:-./by-date}"
 
 command -v exiftool &>/dev/null || warn "exiftool not found. Install with: $(I brew install exiftool)"
 

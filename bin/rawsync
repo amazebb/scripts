@@ -62,26 +62,26 @@ $(B DESCRIPTION)
 $(B OPTIONS)
     $(B -h)        Show this help message
 
+    $(B -e) $(U ext)    Extensions to process $(I '(default: *.ARW)')
+
     $(B -d) $(U date)   Create symlinks for files modified after $(U date) $(I '(default: 1970-01-01)')
 
-    $(B -e) $(U ext)    Extensions to process $(I '(default: *.ARW)')
+    $(B -s) $(U sym)    Root folder location for symlinks ($(I 'default: by-date'))
     
-    $(B -s) $(U sym)    Folder location for symlinks ($(I 'default: by-date'))
-    
-    $(B -f) $(U fmt)    Folder date format $(I '(default: %Y/%Y%m%d)')
+    $(B -f) $(U fmt)    Sub-folder date naming format for symlinks $(I '(default: %Y/%Y%m%d)')
  
 $(B EXAMPLES)
     Backup all files from attached camera volume SD1 to an external SSD
 
         rawsync "/Volumes/SD1/DCIM" "/Volumes/PHOTOS/RAW"
 
-    Backup files taken after 2025-12-01
-
-        rawsync -d 2025-12-01 "/Volumes/SD1/DCIM" "/Volumes/PHOTOS/RAW"
-
     Create symlinks only from the RAW folder and place into /Volumes/PHOTOS/by-date/
 
         rawsync "/Volumes/PHOTOS/RAW"
+
+    Create symlinks for files taken after 2025-12-01
+
+        rawsync -d 2025-12-01 "/Volumes/SD1/DCIM" "/Volumes/PHOTOS/RAW"
 
     Create symlinks only for CR3 raw files
 
@@ -136,13 +136,19 @@ if (($#)); then
     shift
     TARGET_ROOT=$(echo "$TARGET" | cut -d'/' -f1-3)
 
-    Q "Backup $SRC_DIR to $TARGET"
+    list=$(rsync -nia "$SRC_DIR" "$TARGET" 2>"$TARGET_ROOT/rsync_$(date +%Y%m%dT%H%M%S).log")
+    num_copy=$(echo "$list" | grep -c '^>f+')
+    num_modify=$(echo "$list" | grep -c '^\.d')
+
+    Q "Backup from $SRC_DIR to $TARGET: ($num_copy copies, $num_modify modified)"
     rsync -avhP "$SRC_DIR" "$TARGET" 2>"$TARGET_ROOT/rsync_$(date +%Y%m%dT%H%M%S).log"
 else
     TARGET_ROOT=$(echo "$SRC_DIR" | cut -d'/' -f1-3)
 fi
 
-num=$(find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" | wc -l)
+num=$(find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" 2>/dev/null | wc -l)
+((!num)) && warn "No files found in $SRC_DIR"
+
 Q "Create $num symlinks in $TARGET_ROOT/$SYM from $SRC_DIR"
 
 # shellcheck disable=SC2016

@@ -109,22 +109,21 @@ command -v exiftool &>/dev/null || warn "exiftool not found. Install with: $(I b
 
 CACHE="./exif_cache.txt"
 
+total_files=$(find "$SRC" -type f | wc -l)
+
 echo "Scanning with exiftool ..."
 exiftool -fast2 -recurse \
     -printFormat '$Directory/$FileName|$DateTimeOriginal' \
     -dateFormat "$DATE_FMT" \
     "$SRC" 2>/dev/null >"$CACHE" || true
-total=$(wc -l <"$CACHE")
-echo "Scan complete. ${total} files with date metadata found."
+echo "Scan complete. ${total_files} files found."
 
 moved=0
-skipped=0
 collisions=0
 
 while IFS='|' read -r file date_path; do
-    # Skip empty/malformed lines
+    # Skip lines without a valid date
     if [[ -z "$date_path" || "$date_path" != */* ]]; then
-        ((skipped++))
         continue
     fi
 
@@ -153,5 +152,6 @@ while IFS='|' read -r file date_path; do
     ((moved++))
 done <"$CACHE"
 
+skipped=$((total_files - moved))
 echo "Done. Moved: ${moved}, Skipped (no date): ${skipped}, Name collisions: ${collisions}"
 $DRY_RUN && echo "(dry run — no files were moved)"

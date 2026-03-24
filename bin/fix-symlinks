@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2016
+
+U() {
+    tput smul
+    printf '%s' "$*"
+    tput rmul
+}
+
+B() {
+    tput bold
+    printf '%s' "$*"
+    tput sgr0
+}
+
+I() {
+    tput sitm
+    printf '%s' "$*"
+    tput ritm
+}
+
+Q() {
+    read -r -p "$1 [y/n]: "
+    [[ ! $REPLY =~ [Yy] ]] && echo "Aborted." && exit 1
+}
+
+ask() {
+    read -r -p "$1: "
+    echo "$REPLY"
+}
+
+info() { printf "\033[31m%s\033[0m\n" "$1" >&2; }
+
+warn() { info "$1" && exit 1; }
+
+argval() {
+    (($# < 2)) || [[ $2 = -* ]] && warn "Error: $1 requires a valid argument" || echo "$2"
+    # NOTE Because 'warn' is called in a sub-shell, the exit 1 does not
+    # exit immediately. The parse arguments while loop will cycle
+    # through all entered args.
+}
+
+noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B fix-symlinks) - Find broken symlinks and relink them from a source folder
+
+$(B SYNOPSIS)
+    $(B "fix-symlinks [-h] [-n]") $(U source) [$(U target_dir)]
+
+$(B DESCRIPTION)
+    Recursively scans $(U target_dir) $(I '(default: .)') for broken symlinks.
+    For each broken symlink, searches $(U source) for a file with the same
+    basename and extension. If a match is found, the symlink is replaced.
+
+    When multiple matches are found in $(U source), the first match is used
+    and a warning is printed.
+
+$(B OPTIONS)
+    $(B -h)            Show this help message
+
+    $(B -n)            Dry run — list broken symlinks and proposed targets
+
+$(B EXAMPLES)
+    Preview what would be relinked
+
+        fix-symlinks -n /Volumes/Photos/Originals ~/Photos
+
+    Fix broken symlinks in the current directory
+
+        fix-symlinks /Volumes/Backup
+
+EOF
+}
+
+noargs $#
+
+DRY_RUN=false
+
+while (($#)); do
+    case "$1" in
+    -h) usage && exit 0 ;;
+    -n) DRY_RUN=true ;;
+    --)
+        shift
+        break
+        ;;
+    -*) warn "Unknown option: $1" ;;
+    *) break ;;
+    esac
+    shift
+done
+
+SOURCE="${1:-}"
+TARGET="${2:-.}"
+
+[[ -z "$SOURCE" ]] && warn "Error: source directory is required"
+[[ ! -d "$SOURCE" ]] && warn "Error: '$SOURCE' is not a directory"
+[[ ! -d "$TARGET" ]] && warn "Error: '$TARGET' is not a directory"
+
+# Find all broken symlinks
+broken=()
+while IFS= read -r -d '' link; do
+    broken+=("$link")
+done < <(find "$TARGET" -type l ! -exec test -e {} \; -print0)
+
+if ((${#broken[@]} == 0)); then
+    echo "No broken symlinks found in $TARGET"
+    exit 0
+fi
+
+echo "Found ${#broken[@]} broken symlink(s)"
+echo ""
+
+# For each broken symlink, search source for a matching file
+matches=()
+for link in "${broken[@]}"; do
+    name=$(basename "$link")
+    match=$(find "$SOURCE" -type f -name "$name" -print -quit)
+
+    if [[ -n "$match" ]]; then
+        matches+=("$link|$match")
+        if $DRY_RUN; then
+            echo "[dry-run] $link -> $match"
+        fi
+    else
+        echo "[no match] $link"
+    fi
+done
+
+if ((${#matches[@]} == 0)); then
+    echo "No matches found in $SOURCE"
+    exit 0
+fi
+
+echo ""
+echo "${#matches[@]} of ${#broken[@]} broken symlink(s) can be fixed"
+
+if $DRY_RUN; then
+    echo "(dry run — no changes were made)"
+    exit 0
+fi
+
+Q "Proceed with relinking?"
+
+fixed=0
+for entry in "${matches[@]}"; do
+    link="${entry%%|*}"
+    target="${entry#*|}"
+    rm "$link"
+    ln -s "$target" "$link"
+    echo "fixed: $link -> $target"
+    ((fixed++))
+done
+
+echo "Done. Fixed ${fixed} symlink(s)"

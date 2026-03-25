@@ -19,9 +19,23 @@ I() {
     tput ritm
 }
 
+Q() {
+    read -r -p "$1 [y/n]: "
+    [[ ! $REPLY =~ [Yy] ]] && echo "Aborted." && exit 1
+}
+
+ask() {
+    read -r -p "$1: "
+    echo "$REPLY"
+}
+
 info() { printf "\033[31m%s\033[0m\n" "$1" >&2; }
 
 warn() { info "$1" && exit 1; }
+
+argval() {
+    (($# < 2)) || [[ $2 = -* ]] && warn "Error: $1 requires a valid argument" || echo "$2"
+}
 
 noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
 
@@ -31,14 +45,22 @@ $(B NAME)
     $(B iplot) - Plot functions in the Kitty terminal using gnuplot
 
 $(B SYNOPSIS)
-    $(B "iplot [-h]") $(U expression) ...
+    $(B "iplot [-h] [-s style] [-t title]") $(U expression) ...
+    command | $(B "iplot [-s style] [-t title]")
 
 $(B DESCRIPTION)
     Renders gnuplot expressions inline in the Kitty terminal using
     kitten icat. Multiple expressions can be plotted together.
 
+    When data is piped via stdin, plots it as a chart instead. Input
+    should be whitespace or colon-separated $(U "label value") pairs, one per line.
+
 $(B OPTIONS)
     $(B -h)        Show this help message
+
+    $(B -s) $(U style)  Plot style for data mode $(I '(default: boxes)')
+
+    $(B -t) $(U title)  Chart title
 
 $(B EXAMPLES)
     Plot a sine wave
@@ -49,12 +71,25 @@ $(B EXAMPLES)
 
         iplot 'sin(x) title "sin"' , 'cos(x) title "cos"'
 
+    Plot data from stdin as a bar chart
+
+        rawsync -c /Volumes/PHOTOS/by-date | iplot
+
+    Plot data with lines
+
+        cat data.txt | iplot -s linespoints -t "My Data"
+
 EOF
 }
+
+STYLE="boxes"
+TITLE=""
 
 while (($#)); do
     case $1 in
         -h) usage; exit 0 ;;
+        -s) STYLE=$(argval "$@"); shift ;;
+        -t) TITLE=$(argval "$@"); shift ;;
         --) shift; break ;;
         -*) warn "Unknown option: $1" ;;
         *) break ;;
@@ -62,16 +97,35 @@ while (($#)); do
     shift
 done
 
-noargs $#
+if [ ! -t 0 ]; then
+    # Stdin data mode: normalise "label: value" or "label value" to tab-separated
+    DATA=$(awk -F'[: \t]+' '{print $1 "\t" $NF}' <&0)
+    [ -z "$DATA" ] && warn "No data received on stdin"
 
-plot_expr="$*"
+    gnuplot <<EOF
+set terminal pngcairo enhanced font 'Fira Sans,10'
+set output '|kitten icat --stdin yes'
+set object 1 rectangle from screen 0,0 to screen 1,1 fillcolor rgb"#fdf6e3" behind
+set style fill solid
+set xtics rotate by -45
+${TITLE:+set title "$TITLE"}
+plot '-' using 2:xtic(1) with $STYLE notitle
+$DATA
+e
+set output '/dev/null'
+EOF
+else
+    noargs $#
+    plot_expr="$*"
 
-gnuplot <<EOF
+    gnuplot <<EOF
 set terminal pngcairo enhanced font 'Fira Sans,10'
 set autoscale
 set samples 1000
 set output '|kitten icat --stdin yes'
 set object 1 rectangle from screen 0,0 to screen 1,1 fillcolor rgb"#fdf6e3" behind
+${TITLE:+set title "$TITLE"}
 plot ${plot_expr}
 set output '/dev/null'
 EOF
+fi

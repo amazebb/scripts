@@ -50,7 +50,7 @@ $(B NAME)
     $(B rawsync) - Backup photos from camera and organize into date folders
 
 $(B SYNOPSIS)
-    $(B "rawsync [-h] [-d | -e | -s | -f]") $(U source_directory) [$(U target_directory)]
+    $(B "rawsync [-h] [-c] [-d | -e | -s | -f]") $(U source_directory) [$(U target_directory)]
  
 $(B DESCRIPTION)
     Use $(B rsync) to copy files from the $(U source_directory) to a backup destination $(U target_directory).
@@ -62,12 +62,14 @@ $(B DESCRIPTION)
 $(B OPTIONS)
     $(B -h)        Show this help message
 
+    $(B -c)        Count symlinks and files in date folders and exit
+
     $(B -e) $(U ext)    Extensions to process $(I '(default: *.ARW)')
 
     $(B -d) $(U date)   Create symlinks for files modified after $(U date) $(I '(default: 1970-01-01)')
 
     $(B -s) $(U sym)    Root folder location for symlinks ($(I 'default: by-date'))
-    
+
     $(B -f) $(U fmt)    Sub-folder date naming format for symlinks $(I '(default: %Y/%Y%m%d)')
  
 $(B EXAMPLES)
@@ -87,7 +89,22 @@ $(B EXAMPLES)
 
         rawsync -e '*.CR3' "/Volumes/PHOTOS/RAW"
 
+    Count symlinks and files in date folders
+
+        rawsync -c "/Volumes/PHOTOS/by-date"
+
 EOF
+}
+
+count_summary() {
+    for y in $(seq 1999 "$(date +%Y)"); do
+        [ -d "$1/$y" ] || continue
+        Y=${y##*/}
+        for m in {01..12}; do
+            num=$(find "$1/$y/$Y${m}"* \( -type l -o -type f \) 2>/dev/null | wc -l)
+            ((num)) && echo "$y/$Y${m}: $num"
+        done
+    done
 }
 
 noargs $#
@@ -102,6 +119,7 @@ var[-e]='*.ARW'
 while (($#)); do
     case $1 in
     -h) usage && exit 0 ;;
+    -c) COUNT=1 ;;
     -d | -e | -f | -s)
         var["$1"]=$(argval "$@")
         shift
@@ -129,6 +147,11 @@ fi
 
 SRC_DIR="$1"
 shift
+
+if ((COUNT)); then
+    count_summary "$SRC_DIR"
+    exit 0
+fi
 
 if (($#)); then
     command -v rsync >/dev/null || warn "rsync not found"

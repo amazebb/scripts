@@ -58,6 +58,9 @@ $(B DESCRIPTION)
     browsing for files by date easier.
     If only the $(U source_directory) is given then only symlinks are created.
     The $(B exiftool) is used to extract date information from the files to create the symlinks.
+    Symlinks are named $(I yyyymmdd_HHMMSS-TZ.ext) (e.g. $(I 20260101_163523-0700.ARW)) using the
+    EXIF timezone offset, with a fallback to the file modification date timezone when it
+    matches DateTimeOriginal to the second.
 
 $(B OPTIONS)
     $(B -h)        Show this help message
@@ -70,7 +73,7 @@ $(B OPTIONS)
 
     $(B -s) $(U sym)    Root folder location for symlinks ($(I 'default: by-date'))
 
-    $(B -f) $(U fmt)    Sub-folder date naming format for symlinks $(I '(default: %Y/%Y%m%d)')
+    $(B -f) $(U fmt)    Sub-folder date naming format for symlinks $(I '(default: %Y/%Y%m)')
  
 $(B EXAMPLES)
     Backup all files from attached camera volume SD1 to an external SSD
@@ -112,7 +115,7 @@ noargs $#
 declare -A var
 var[-s]="by-date"
 var[-d]="1970-01-01"
-var[-f]="%Y/%Y%m%d"
+var[-f]="%Y/%Y%m"
 var[-e]='*.ARW'
 
 # Parse arguments
@@ -174,22 +177,74 @@ num=$(find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" 2>/dev/null | wc -l
 ((!num)) && warn "No files found in $SRC_DIR"
 
 command -v grealpath >/dev/null || warn "GNU coreutils grealpath is needed 'brew install coreutils'"
+command -v gdate >/dev/null || warn "GNU coreutils gdate is needed 'brew install coreutils'"
 command -v exiftool >/dev/null || warn "exiftool not found"
 Q "Create $num symlinks in $TARGET_ROOT/$SYM from $SRC_DIR"
 
 failed=0
-while IFS='|' read -r src date; do
-    target_dir="$TARGET_ROOT/$SYM/$date"
+count=0
+start=$SECONDS
+last_update=$SECONDS
+while IFS='|' read -r src dto oto ot fmd; do
+    [[ -z "$dto" ]] && continue
+    ((count++))
+
+    # Progress update every second
+    now=$SECONDS
+    if ((now > last_update)); then
+        elapsed=$((now - start))
+        eta=$(((num - count) * elapsed / count))
+        printf "\r\033[K%d/%d symlinks (%ds elapsed, ~%ds remaining)" "$count" "$num" "$elapsed" "$eta" >&2
+        last_update=$now
+    fi
+
+    # Determine timezone: OffsetTimeOriginal > OffsetTime > FileModifyDate fallback
+    tz=""
+    for offset in "$oto" "$ot"; do
+        offset="${offset#"${offset%%[![:space:]]*}"}"
+        if [[ -n "$offset" ]]; then
+            tz="${offset//:/}"
+            break
+        fi
+    done
+    if [[ -z "$tz" && -n "$fmd" ]]; then
+        fmd_dt="${fmd:0:19}"
+        if [[ "$fmd_dt" == "$dto" ]]; then
+            tz="${fmd:19}"
+            tz="${tz//:/}"
+        fi
+    fi
+
+    # Format symlink name: yyyymmdd_HHMMSS-TZ.ext
+    dt="${dto//:/}"
+    dt="${dt// /_}"
+    ext="${src##*.}"
+    base="${dt}${tz}"
+
+    # Format subfolder using DATE_FMT (convert EXIF "YYYY:MM:DD" to "YYYY-MM-DD")
+    subfolder=$(gdate -d "${dto:0:4}-${dto:5:2}-${dto:8}" "+$DATE_FMT" 2>/dev/null)
+    [[ -z "$subfolder" ]] && continue
+
+    target_dir="$TARGET_ROOT/$SYM/$subfolder"
     mkdir -p "$target_dir"
+
+    # Deduplicate: append _N suffix if symlink already exists
+    sym_name="${base}.${ext}"
+    n=1
+    while [[ -e "$target_dir/$sym_name" ]]; do
+        sym_name="${base}_${n}.${ext}"
+        ((n++))
+    done
+
     src_file=$(grealpath --relative-to="$target_dir" "$src")
-    if ! ln -sf "$src_file" "$target_dir/"; then
+    if ! ln -sf "$src_file" "$target_dir/$sym_name"; then
         ((failed++))
     fi
 done < <(
     find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" -print0 |
         xargs -0 exiftool -fast2 \
-            -printFormat '$Directory/$FileName|$DateTimeOriginal' \
-            -dateFormat "$DATE_FMT"
+            -printFormat '$Directory/$FileName|$DateTimeOriginal|$OffsetTimeOriginal|$OffsetTime|$FileModifyDate'
 )
 
+printf "\r\033[K%d/%d symlinks done in %ds\n" "$count" "$num" "$((SECONDS - start))" >&2
 ((failed)) && info "$failed symlinks failed to create"

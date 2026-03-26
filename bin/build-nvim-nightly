@@ -109,7 +109,11 @@ echo
 Q "Pull latest and build neovim nightly?"
 
 cd "$REPO" || exit
-git pull
+pull_output=$(git pull)
+echo "$pull_output"
+if [[ "$pull_output" == "Already up to date." ]]; then
+    Q "No changes from git pull. Proceed with build anyway?"
+fi
 info "$(B Making latest nightly build...)"
 rm -rf build
 make CMAKE_BUILD_TYPE=Release CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$NVIM_NIGHTLY"

@@ -30,7 +30,7 @@ ask() {
     echo "$REPLY"
 }
 
-info() { printf "\033[31m%s\033[0m\n" "$1" >&2; }
+info() { printf "\033[34m%s\033[0m\n" "$1" >&2; }
 
 warn() { info "$1" && exit 1; }
 
@@ -110,7 +110,13 @@ Q "Pull latest and build neovim nightly?"
 
 cd "$REPO" || exit
 git pull
+info "$(B Making latest nightly build...)"
 rm -rf build
 make CMAKE_BUILD_TYPE=Release CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$NVIM_NIGHTLY"
+info "$(B "Removing $NVIM_NIGHTLY/lib and $NVIM_NIGHTLY/share...")"
+rm -rf "${NVIM_NIGHTLY:?}/lib"
+rm -rf "${NVIM_NIGHTLY:?}/share"
+info "$(B Installing latest nightly build...)"
 make install
+info "$(B Linking "$NVIM_NIGHTLY/bin/nvim -> $HOME/.local/bin")"
 ln -sf "$NVIM_NIGHTLY/bin/nvim" "$HOME/.local/bin"

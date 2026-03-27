@@ -2,25 +2,21 @@
 
 Contains a repository of useful, semi-useful and somewhat less useful scripts 
 
-## Download
+## Install
 
-First make sure we have a `~/.local/share/scripts` folder then clone: 
+Clone into `~/.local/share` and run the install script to symlink all scripts into `~/.local/bin`:
 
 ```bash
 mkdir -p ~/.local/share
-cd ~/.local/share
-git clone https://github.com/broeknbytes/scripts.git
+git clone --depth 1 https://github.com/broeknbytes/scripts.git ~/.local/share/scripts
 cd ~/.local/share/scripts
+./install.sh
 ```
 
-## Install
-
-All `scripts/bin/*` will be symlinked into `$HOME/.local/bin` 
-
-Run 
+Make sure `~/.local/bin` is in your `$PATH`. Add this to your `~/.bashrc` or `~/.zshrc` if it isn't already:
 
 ```bash
-./install.sh
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
 ## Disclaimer

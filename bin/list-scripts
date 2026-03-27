@@ -101,12 +101,19 @@ while read -r script; do
     if [[ "$script" =~ \.awk ]]; then
         B+=(awk)
     else
-        # Determine script type from shebang (first line)
-        B+=("$(head -n 1 "$script" | sed 's|^#\!/usr/bin/env ||')")
+        # Determine script type from shebang or vim modeline
+        first_line=$(head -n 1 "$script")
+        if [[ "$first_line" == "#!"* ]]; then
+            B+=("${first_line//#!\/usr\/bin\/env /}")
+        elif [[ "$first_line" =~ vim:.*ft=([a-z]+) ]]; then
+            B+=("${BASH_REMATCH[1]}")
+        else
+            B+=("unknown")
+        fi
     fi
 
-    # Extract the first comment line that starts with # (ignoring shebang)
-    desc=$(grep "^#[^!]" "$script" | head -n 1 | sed 's/^# *//')
+    # Extract the first comment line that starts with # (ignoring shebang and # vim:)
+    desc=$(grep -v -E '^#(!| ?vim:)' "$script" | head -n 1 | sed 's/^# *//')
 
     # If no description found, use a placeholder
     desc=${desc:-"No description"}

@@ -1,4 +1,5 @@
 #!/usr/bin/env zsh
+# Helper function used by fzf-man
 
 cyan=$(tput setaf 6)
 blue=$(tput setaf 4)

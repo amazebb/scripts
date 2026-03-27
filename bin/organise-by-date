@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Organise files into date-based directories using EXIF metadata
 # shellcheck disable=SC2016
 
 U() {

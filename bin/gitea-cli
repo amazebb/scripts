@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2016
 # Manage Gitea: start, stop, status, logs.
+# shellcheck disable=SC2016
 
 U() {
     tput smul

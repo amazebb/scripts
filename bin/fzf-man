@@ -1,3 +1,4 @@
+# vim: ft=zsh
 # Interactive man page/tldr searcher with fzf, bat, and key bindings
 
 # shellcheck disable=SC2016

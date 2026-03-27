@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Plot functions in the Kitty terminal using gnuplot
 # shellcheck disable=SC2016
 
 U() {
@@ -87,12 +88,24 @@ TITLE=""
 
 while (($#)); do
     case $1 in
-        -h) usage; exit 0 ;;
-        -s) STYLE=$(argval "$@"); shift ;;
-        -t) TITLE=$(argval "$@"); shift ;;
-        --) shift; break ;;
-        -*) warn "Unknown option: $1" ;;
-        *) break ;;
+    -h)
+        usage
+        exit 0
+        ;;
+    -s)
+        STYLE=$(argval "$@")
+        shift
+        ;;
+    -t)
+        TITLE=$(argval "$@")
+        shift
+        ;;
+    --)
+        shift
+        break
+        ;;
+    -*) warn "Unknown option: $1" ;;
+    *) break ;;
     esac
     shift
 done

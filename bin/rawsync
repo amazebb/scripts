@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Backup photos from camera and organize into date folders
+# RAW image backups and organizer
 
 # shellcheck disable=SC2016
 
@@ -50,12 +50,14 @@ $(B NAME)
     $(B rawsync) - Backup photos from camera and organize into date folders
 
 $(B SYNOPSIS)
-    $(B "rawsync [-h] [-c] [-d | -e | -s | -f]") $(U source_directory) [$(U target_directory)]
- 
+    $(B "rawsync [-h] [-c] [-d date] [-e ext] [-f day|month] [-s path]") $(U source_directory) [$(U target_directory)]
+
 $(B DESCRIPTION)
     Use $(B rsync) to copy files from the $(U source_directory) to a backup destination $(U target_directory).
-    Additionally a 'by-date' folder is created with symlinks to the backups to make 
-    browsing for files by date easier.
+    Additionally a $(I raw-by-day) (or $(I raw-by-month)) folder is created with symlinks to the
+    backups to make browsing for files by date easier. By default this folder is placed
+    inside the RAW folder (the $(U target_directory), or the $(U source_directory) if no target
+    is given); use $(B -s) to override that location.
     If only the $(U source_directory) is given then only symlinks are created.
     The $(B exiftool) is used to extract date information from the files to create the symlinks.
     Symlinks are named $(I yyyymmdd_HHMMSS-TZ.ext) (e.g. $(I 20260101_163523-0700.ARW)) using the
@@ -71,30 +73,44 @@ $(B OPTIONS)
 
     $(B -d) $(U date)   Create symlinks for files modified after $(U date) $(I '(default: 1970-01-01)')
 
-    $(B -s) $(U sym)    Root folder location for symlinks ($(I 'default: by-date'))
+    $(B -f) $(U fmt)    Date grouping for symlinks: $(B day) creates $(I raw-by-day/%Y/%Y%m%d),
+              $(B month) creates $(I raw-by-month/%Y/%Y%m), or pass any $(B gdate) format
+              string (e.g. $(I %Y/%Y%m)) to use it directly — the parent folder is
+              named $(I raw-by-)$(U fmt) with % stripped and / replaced by _
+              $(I '(default: day)')
 
-    $(B -f) $(U fmt)    Sub-folder date naming format for symlinks $(I '(default: %Y/%Y%m)')
- 
+    $(B -s) $(U path)   Parent folder for the $(I raw-by-day)/$(I raw-by-month) folder
+              $(I '(default: inside the RAW folder)')
+
 $(B EXAMPLES)
-    Backup all files from attached camera volume SD1 to an external SSD
+    Backup all files from attached camera volume SD1 to an external SSD,
+    creating symlinks in /Volumes/PHOTOS/RAW/raw-by-day/
 
         rawsync "/Volumes/SD1/DCIM" "/Volumes/PHOTOS/RAW"
 
-    Create symlinks only from the RAW folder and place into /Volumes/PHOTOS/by-date/
+    Create only symlinks in /Volumes/PHOTOS/RAW/raw-by-day/ from the RAW folder
 
         rawsync "/Volumes/PHOTOS/RAW"
 
-    Create symlinks for files taken after 2025-12-01
+    Create only symlinks in /Volumes/PHOTOS/RAW/raw-by-month/ grouped by month
+
+        rawsync -f month "/Volumes/PHOTOS/RAW"
+
+    Place the $(I raw-by-day) folder at the volume root instead of inside the RAW folder
+
+        rawsync -s /Volumes/PHOTOS "/Volumes/PHOTOS/RAW"
+
+    Create only symlinks for files taken after 2025-12-01
 
         rawsync -d 2025-12-01 "/Volumes/SD1/DCIM" "/Volumes/PHOTOS/RAW"
 
-    Create symlinks only for CR3 raw files
+    Create only symlinks for CR3 raw files
 
         rawsync -e '*.CR3' "/Volumes/PHOTOS/RAW"
 
     Count symlinks and files in date folders
 
-        rawsync -c "/Volumes/PHOTOS/by-date"
+        rawsync -c "/Volumes/PHOTOS/RAW/raw-by-day"
 
 EOF
 }
@@ -113,9 +129,8 @@ count_summary() {
 noargs $#
 
 declare -A var
-var[-s]="by-date"
 var[-d]="1970-01-01"
-var[-f]="%Y/%Y%m"
+var[-f]="day"
 var[-e]='*.ARW'
 
 # Parse arguments
@@ -141,8 +156,17 @@ done
 
 DATE="${var[-d]}"
 EXT="${var[-e]}"
-DATE_FMT="${var[-f]}"
-SYM="${var[-s]}"
+
+case "${var[-f]}" in
+    day)   SYM="raw-by-day"   DATE_FMT="%Y/%Y%m%d" ;;
+    month) SYM="raw-by-month" DATE_FMT="%Y/%Y%m" ;;
+    *)
+        DATE_FMT="${var[-f]}"
+        fmt="${DATE_FMT//%/}"
+        fmt="${fmt//\//_}"
+        SYM="raw-by-$fmt"
+        ;;
+esac
 
 if ((!$#)); then
     warn "Error: source_directory required"
@@ -162,6 +186,7 @@ if (($#)); then
     TARGET="$1"
     shift
     TARGET_ROOT=$(echo "$TARGET" | cut -d'/' -f1-3)
+    SYM_ROOT="${var[-s]:-$TARGET}"
 
     list=$(rsync -nia "$SRC_DIR" "$TARGET" 2>&1) || warn "$list"
     num_copy=$(echo "$list" | grep -c '^>f+')
@@ -170,7 +195,7 @@ if (($#)); then
     Q "Backup from $SRC_DIR to $TARGET: ($num_copy copies, $num_meta folder meta changes)"
     rsync -avhP "$SRC_DIR" "$TARGET" 2>"$TARGET_ROOT/rsync_$(date +%Y%m%dT%H%M%S).log"
 else
-    TARGET_ROOT=$(echo "$SRC_DIR" | cut -d'/' -f1-3)
+    SYM_ROOT="${var[-s]:-$SRC_DIR}"
 fi
 
 num=$(find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" 2>/dev/null | wc -l)
@@ -179,7 +204,7 @@ num=$(find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" 2>/dev/null | wc -l
 command -v grealpath >/dev/null || warn "GNU coreutils grealpath is needed 'brew install coreutils'"
 command -v gdate >/dev/null || warn "GNU coreutils gdate is needed 'brew install coreutils'"
 command -v exiftool >/dev/null || warn "exiftool not found"
-Q "Create $num symlinks in $TARGET_ROOT/$SYM from $SRC_DIR"
+Q "Create $num symlinks in $SYM_ROOT/$SYM from $SRC_DIR"
 
 failed=0
 count=0
@@ -225,7 +250,7 @@ while IFS='|' read -r src dto oto ot fmd; do
     subfolder=$(gdate -d "${dto:0:4}-${dto:5:2}-${dto:8}" "+$DATE_FMT" 2>/dev/null)
     [[ -z "$subfolder" ]] && continue
 
-    target_dir="$TARGET_ROOT/$SYM/$subfolder"
+    target_dir="$SYM_ROOT/$SYM/$subfolder"
     mkdir -p "$target_dir"
 
     # Deduplicate: append _N suffix if symlink already exists

@@ -48,10 +48,10 @@ noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
 usage() {
     cat <<EOF
 $(B NAME)
-    $(B organise-by-date) - Organise files into date-based directories using EXIF metadata
+    $(B exifmv) - Organise files into date-based directories using EXIF metadata
 
 $(B SYNOPSIS)
-    $(B "organise-by-date [-h] [-n] [-d fmt]") $(U source_dir) [$(U dest)]
+    $(B "exifmv [-h] [-n] [-d fmt]") $(U source_dir) [$(U dest)]
 
 $(B DESCRIPTION)
     Scans $(U source_dir) recursively with exiftool, extracts DateTimeOriginal
@@ -71,15 +71,15 @@ $(B OPTIONS)
 $(B EXAMPLES)
     Preview what would happen
 
-        organise-by-date -n /Volumes/SD/DCIM
+        exifmv -n /Volumes/SD/DCIM
 
     Move files into a custom destination
 
-        organise-by-date /Volumes/SD/DCIM /Photos/Sorted
+        exifmv /Volumes/SD/DCIM /Photos/Sorted
 
     Use a flat year-month directory structure
 
-        organise-by-date -d '%Y-%m' /Volumes/SD/DCIM
+        exifmv -d '%Y-%m' /Volumes/SD/DCIM
 
 EOF
 }

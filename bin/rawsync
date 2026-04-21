@@ -47,10 +47,10 @@ noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
 usage() {
     cat <<EOF
 $(B NAME)
-    $(B rawsync) - Backup photos from camera and organize into date folders
+    $(B rawsync) - RAW image backups and organizer
 
 $(B SYNOPSIS)
-    $(B "rawsync [-h] [-c] [-d date] [-e ext] [-f day|month] [-s path]") $(U source_directory) [$(U target_directory)]
+    $(B "rawsync [-h] [-c] [-d date] [-e ext] [-f day|month|fmt] [-s path]") $(U source_directory) [$(U target_directory)]
 
 $(B DESCRIPTION)
     Use $(B rsync) to copy files from the $(U source_directory) to a backup destination $(U target_directory).
@@ -158,14 +158,14 @@ DATE="${var[-d]}"
 EXT="${var[-e]}"
 
 case "${var[-f]}" in
-    day)   SYM="raw-by-day"   DATE_FMT="%Y/%Y%m%d" ;;
-    month) SYM="raw-by-month" DATE_FMT="%Y/%Y%m" ;;
-    *)
-        DATE_FMT="${var[-f]}"
-        fmt="${DATE_FMT//%/}"
-        fmt="${fmt//\//_}"
-        SYM="raw-by-$fmt"
-        ;;
+day) SYM="raw-by-day" DATE_FMT="%Y/%Y%m%d" ;;
+month) SYM="raw-by-month" DATE_FMT="%Y/%Y%m" ;;
+*)
+    DATE_FMT="${var[-f]}"
+    fmt="${DATE_FMT//%/}"
+    fmt="${fmt//\//_}"
+    SYM="raw-by-$fmt"
+    ;;
 esac
 
 if ((!$#)); then

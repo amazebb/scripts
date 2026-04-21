@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# Tally files by extension, sorted by count, size, or extension
+
+# shellcheck disable=SC2016
+
+U() {
+    tput smul
+    printf '%s' "$*"
+    tput rmul
+}
+
+B() {
+    tput bold
+    printf '%s' "$*"
+    tput sgr0
+}
+
+I() {
+    tput sitm
+    printf '%s' "$*"
+    tput ritm
+}
+
+Q() {
+    read -r -p "$1 [y/n]: "
+    [[ ! $REPLY =~ [Yy] ]] && echo "Aborted." && exit 1
+}
+
+ask() {
+    read -r -p "$1: "
+    echo "$REPLY"
+}
+
+msg() { printf "\033[%sm%s\033[0m\n" "$2" "$1" >&2; }
+
+info() { msg "$1" 34; }
+
+warn() { msg "$1" 31 && exit 1; }
+
+argval() {
+    (($# < 2)) || [[ $2 = -* ]] && warn "Error: $1 requires a valid argument" || echo "$2"
+}
+
+noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B fext) - Tally files by extension
+
+$(B SYNOPSIS)
+    $(B "fext [-h] [-t type] [-s column]") [$(U path)]
+
+$(B DESCRIPTION)
+    Recursively tally files by extension under $(U path) $(I '(default: .)'),
+    restricted to $(B find) $(B -type) $(U type). Outputs three columns:
+    file count, total size (human-readable, B/K/M/G/T), extension.
+
+$(B OPTIONS)
+    $(B -h)        Show this help message
+
+    $(B -b)        Report allocated block size instead of logical size
+
+    $(B -t) $(U type)   $(B find) file type $(I '(default: f)')
+
+    $(B -s) $(U column) Sort column: 1=count, 2=size, 3=extension $(I '(default: 1)')
+
+$(B EXAMPLES)
+    Sort by size descending under current directory
+
+        fext -s 2
+
+    Tally directories under /tmp
+
+        fext -t d /tmp
+
+EOF
+}
+
+type=f
+col=1
+size_fmt=$'%z\t%N'
+
+while (($#)); do
+    case $1 in
+        -h) usage; exit 0 ;;
+        -b) size_fmt=$'%b\t%N' ;;
+        -t) type=$(argval "$@"); shift ;;
+        -s) col=$(argval "$@"); shift ;;
+        --) shift; break ;;
+        -*) warn "Unknown option: $1" ;;
+        *) break ;;
+    esac
+    shift
+done
+
+path=${1:-.}
+
+[[ -e $path ]] || warn "Error: path does not exist: $path"
+[[ $col =~ ^[123]$ ]] || warn "Error: -s must be 1, 2, or 3"
+
+find "$path" -type "$type" -exec stat -f "$size_fmt" {} + |
+    awk -F'\t' -v blk="$([[ $size_fmt == *%b* ]] && echo 512 || echo 1)" '{
+        n = split($2, p, "/"); name = p[n]
+        m = match(name, /\.[^.]+$/)
+        key = (m > 1) ? tolower(substr(name, m + 1)) : name
+        c[key]++; s[key] += $1 * blk
+    }
+    END { for (e in c) printf "%d\t%d\t%s\n", c[e], s[e], e }' |
+    sort -t$'\t' "-k${col},${col}hr" |
+    awk -F'\t' '
+    function h(b,   u,i) {
+        split("B K M G T", u, " "); i = 1
+        while (b >= 1024 && i < 5) { b /= 1024; i++ }
+        return (i == 1) ? sprintf("%d%s", b, u[i]) : sprintf("%.1f%s", b, u[i])
+    }
+    { printf "%7d  %9s  %s\n", $1, h($2), $3 }'

@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# Generate a single markdown document with a TOC of shell script usages
+# shellcheck disable=SC2016
+
+U() {
+    tput smul
+    printf '%s' "$*"
+    tput rmul
+}
+
+B() {
+    tput bold
+    printf '%s' "$*"
+    tput sgr0
+}
+
+I() {
+    tput sitm
+    printf '%s' "$*"
+    tput ritm
+}
+
+Q() {
+    read -r -p "$1 [y/n]: "
+    [[ ! $REPLY =~ [Yy] ]] && echo "Aborted." && exit 1
+}
+
+ask() {
+    read -r -p "$1: "
+    echo "$REPLY"
+}
+
+msg() { printf "\033[%sm%s\033[0m\n" "$2" "$1" >&2; }
+
+info() { msg "$1" 34; }
+
+warn() { msg "$1" 31 && exit 1; }
+
+argval() {
+    (($# < 2)) || [[ $2 = -* ]] && warn "Error: $1 requires a valid argument" || echo "$2"
+}
+
+noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B shtoc) - Summarize shell script usages as a single TOC-linked markdown
+
+$(B SYNOPSIS)
+    $(B "shtoc [-h]") $(U dir)
+
+$(B DESCRIPTION)
+    Scans $(U dir) for bash shell scripts and emits a
+    single markdown document to stdout. The document opens with a table
+    of contents that links to one anchor per script, followed by each
+    script's usage() body as produced by $(B shtomd).
+
+    A file is treated as a shell script when its first line contains a
+    bash or sh shebang. Scripts without a $(B usage)$(I \(\)) heredoc are
+    skipped with a notice on stderr.
+
+$(B OPTIONS)
+    $(B -h)        Show this help message
+
+$(B EXAMPLES)
+    Summarize all scripts in bin/
+
+        shtoc bin > scripts.md
+
+    Summarize scripts in the current directory
+
+        shtoc . > scripts.md
+
+EOF
+}
+
+noargs $#
+
+while (($#)); do
+    case "$1" in
+    -h) usage && exit 0 ;;
+    --)
+        shift
+        break
+        ;;
+    -*) warn "Unknown option: $1" ;;
+    *) break ;;
+    esac
+    shift
+done
+
+DIR="${1:-}"
+[[ -z "$DIR" ]] && warn "Error: directory argument is required"
+[[ ! -d "$DIR" ]] && warn "Error: '$DIR' is not a directory"
+
+SHTOMD="$(dirname "$0")/shtomd"
+[[ ! -x "$SHTOMD" ]] && SHTOMD="$(command -v shtomd 2>/dev/null)"
+[[ -z "$SHTOMD" || ! -x "$SHTOMD" ]] && warn "Error: shtomd not found on PATH or alongside shtoc"
+
+scripts=()
+while IFS= read -r -d '' f; do
+    IFS= read -r first < "$f" || continue
+    [[ $first =~ ^#!.*(bash|sh)([[:space:]]|$) ]] && scripts+=("$f")
+done < <(find "$DIR" -maxdepth 1 -type f -print0 | sort -z)
+
+((${#scripts[@]} == 0)) && warn "Error: no shell scripts found in '$DIR'"
+
+# Filter to scripts that actually have a usage() heredoc shtomd can parse.
+rendered=()
+for f in "${scripts[@]}"; do
+    out=$("$SHTOMD" "$f" 2>/dev/null) || {
+        info "skipped $(basename "$f"): no usage() heredoc"
+        continue
+    }
+    rendered+=("$(basename "$f")"$'\x1f'"$out")
+done
+
+((${#rendered[@]} == 0)) && warn "Error: no scripts with usage() heredocs found"
+
+printf '# Scripts\n\n'
+printf '## Table of Contents\n\n'
+for entry in "${rendered[@]}"; do
+    name=${entry%%$'\x1f'*}
+    printf -- '- [%s](#%s)\n' "$name" "$name"
+done
+printf '\n'
+
+for entry in "${rendered[@]}"; do
+    name=${entry%%$'\x1f'*}
+    body=${entry#*$'\x1f'}
+    printf '## %s\n\n%s\n\n' "$name" "$body"
+done

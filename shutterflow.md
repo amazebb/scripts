@@ -9,6 +9,11 @@ The scenario: you shoot a few hundred RAW frames on an outing, pull the card,
 and want a predictable, safe way to get them into long-term storage without
 losing a file, duplicating a file, or breaking your date-browsing folder.
 
+**Prerequisite**: `dedupe` shells out to
+[broeknbytes/rapidhash](https://github.com/broeknbytes/rapidhash) for the
+actual hashing step. Install it first — see that repo's README. The rest of
+the scripts rely on standard tools (`rsync`, `exiftool`, `gdate`).
+
 ---
 
 ## 1. Ingest: back up the card with `rawsync`
@@ -21,6 +26,11 @@ make them browsable by date without physically reorganising the originals.
 parallel `raw-by-day/YYYY/YYYYMMDD/` tree of symlinks that point back into the
 flat rsync target. You keep the rsync-friendly flat structure for the real
 files, and get a date-indexed browsing layer for free.
+
+By default `rawsync` targets Sony `*.ARW` files — that's a deliberate default
+matching the primary shooter this repo was built for, not a hard constraint.
+Pass `-e` to process any other RAW extension (`*.CR3`, `*.NEF`, `*.RAF`,
+`*.DNG`, etc.) or JPEGs.
 
 ```bash
 rawsync /Volumes/SD1/DCIM /Volumes/PHOTOS/RAW
@@ -73,6 +83,14 @@ each eating disk.
 to replace duplicates with symlinks pointing at a preferred source location —
 so you keep one real copy and reclaim the space without breaking any
 reference that expects the file to exist at its old path.
+
+The hashing itself is done by
+[broeknbytes/rapidhash](https://github.com/broeknbytes/rapidhash), chosen
+because RAW files are large (often 40–80 MB each) and a RAW archive can run
+to tens of thousands of them. rapidhash is throughput-oriented and
+parallelised (`dedupe` invokes it with `-j 40`), so hashing a full archive
+completes in a reasonable time instead of bottlenecking on a slower
+cryptographic hash you don't need for duplicate detection.
 
 ```bash
 dedupe -e arw /Volumes/PHOTOS/RAW

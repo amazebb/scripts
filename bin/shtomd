@@ -51,7 +51,7 @@ $(B SYNOPSIS)
     $(B "shtomd [-h]") $(U script)
 
 $(B DESCRIPTION)
-    Reads $(U script), locates the heredoc body inside its $(B usage)$(I \(\))
+    Reads $(U script), locates the heredoc body inside its $(B usage)()
     function, and emits it wrapped in an HTML $(I '<pre>') block so that the
     original indentation is preserved while still allowing inline formatting
     to render in markdown viewers.
@@ -104,6 +104,11 @@ body=$(awk '
 [[ -z "$body" ]] && warn "Error: no usage() heredoc found in '$SCRIPT'"
 
 md=$(printf '%s\n' "$body" | sed -E '
+    s/\\\$/__SHTOMD_DOLLAR__/g
+    s/\\\\/\\/g
+    s/&/\&amp;/g
+    s/</\&lt;/g
+    s/>/\&gt;/g
     s/\$\(B "([^"]+)"\)/<b>\1<\/b>/g
     s/\$\(B '\''([^'\'']+)'\''\)/<b>\1<\/b>/g
     s/\$\(B ([^)]+)\)/<b>\1<\/b>/g
@@ -113,6 +118,7 @@ md=$(printf '%s\n' "$body" | sed -E '
     s/\$\(I "([^"]+)"\)/<i>\1<\/i>/g
     s/\$\(I '\''([^'\'']+)'\''\)/<i>\1<\/i>/g
     s/\$\(I ([^)]+)\)/<i>\1<\/i>/g
+    s/__SHTOMD_DOLLAR__/$/g
 ')
 
 printf '<pre>\n%s\n</pre>\n' "$md"

@@ -57,7 +57,7 @@ $(B DESCRIPTION)
     script's usage() body as produced by $(B shtomd).
 
     A file is treated as a shell script when its first line contains a
-    bash or sh shebang. Scripts without a $(B usage)$(I \(\)) heredoc are
+    bash or sh shebang. Scripts without a $(B usage)() heredoc are
     skipped with a notice on stderr.
 
 $(B OPTIONS)
@@ -100,7 +100,7 @@ SHTOMD="$(dirname "$0")/shtomd"
 
 scripts=()
 while IFS= read -r -d '' f; do
-    IFS= read -r first < "$f" || continue
+    IFS= read -r first <"$f" || continue
     [[ $first =~ ^#!.*(bash|sh)([[:space:]]|$) ]] && scripts+=("$f")
 done < <(find "$DIR" -maxdepth 1 -type f -print0 | sort -z)
 

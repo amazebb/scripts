@@ -33,9 +33,9 @@
 <b>OPTIONS</b>
     <b>-h</b>        Show this help message
 
-    <b>-r</b> <u>repo</u>   Local neovim repo <i>(default: \$HOME/Code/GitHub/neovim)</i>
+    <b>-r</b> <u>repo</u>   Local neovim repo <i>(default: $HOME/Code/GitHub/neovim)</i>
 
-    <b>-d</b> <u>dir</u>    Install folder for nvim-nightly build <i>(default: \$HOME/.nvim-nightly)</i>
+    <b>-d</b> <u>dir</u>    Install folder for nvim-nightly build <i>(default: $HOME/.nvim-nightly)</i>
 
 <b>EXAMPLES</b>
     Build using defaults
@@ -74,8 +74,8 @@
 
     Create the sparse bundle (one-time setup)
 
-        hdiutil create -size 10g -type SPARSEBUNDLE -fs APFS \\
-            -encryption -stdinpass -volname SPARSE \\
+        hdiutil create -size 10g -type SPARSEBUNDLE -fs APFS \
+            -encryption -stdinpass -volname SPARSE \
             ~/Library/Mobile\ Documents/com~apple~CloudDocs/SPARSE.sparsebundle
 </pre>
 
@@ -374,7 +374,7 @@
 
 <b>DESCRIPTION</b>
     List scripts with description and optionally warn if there are issues
-    <u>script_directory</u> defaults to <i>\$HOME/.local/share/scripts/bin</i>
+    <u>script_directory</u> defaults to <i>$HOME/.local/share/scripts/bin</i>
 
 <b>OPTIONS</b>
     <b>-h</b> Show this help message
@@ -473,7 +473,7 @@
     script's usage() body as produced by <b>shtomd</b>.
 
     A file is treated as a shell script when its first line contains a
-    bash or sh shebang. Scripts without a <b>usage</b><i>\(\</i>) heredoc are
+    bash or sh shebang. Scripts without a <b>usage</b>() heredoc are
     skipped with a notice on stderr.
 
 <b>OPTIONS</b>
@@ -482,11 +482,11 @@
 <b>EXAMPLES</b>
     Summarize all scripts in bin/
 
-        shtoc bin > scripts.md
+        shtoc bin &gt; scripts.md
 
     Summarize scripts in the current directory
 
-        shtoc . > scripts.md
+        shtoc . &gt; scripts.md
 </pre>
 
 ## shtomd
@@ -499,14 +499,14 @@
     <b>shtomd [-h]</b> <u>script</u>
 
 <b>DESCRIPTION</b>
-    Reads <u>script</u>, locates the heredoc body inside its <b>usage</b><i>\(\</i>)
-    function, and emits it wrapped in an HTML <i><pre></i> block so that the
+    Reads <u>script</u>, locates the heredoc body inside its <b>usage</b>()
+    function, and emits it wrapped in an HTML <i>&lt;pre&gt;</i> block so that the
     original indentation is preserved while still allowing inline formatting
     to render in markdown viewers.
 
-    The tput-helper calls are rewritten inline: <i>\<b>x</b></i> becomes
-    <i><b>x</b></i>, <i>\<u>x</u></i> becomes <i><u>x</u></i>, and
-    <i>\<i>x</i></i> becomes <i><i>x</i></i>. Surrounding single or double
+    The tput-helper calls are rewritten inline: <i>$(B x)</i> becomes
+    <i>&lt;b&gt;x&lt;/b&gt;</i>, <i>$(U x)</i> becomes <i>&lt;u&gt;x&lt;/u&gt;</i>, and
+    <i>$(I x)</i> becomes <i>&lt;i&gt;x&lt;/i&gt;</i>. Surrounding single or double
     quotes around the argument are stripped.
 
 <b>OPTIONS</b>
@@ -519,6 +519,6 @@
 
     Write the usage to a file
 
-        shtomd bin/exifmv > exifmv.md
+        shtomd bin/exifmv &gt; exifmv.md
 </pre>
 

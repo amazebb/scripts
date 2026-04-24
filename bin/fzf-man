@@ -5,7 +5,7 @@
 
 # TODO consider adding GNI info, eg: `info coreutils "$1" invocation 2>/dev/null`
 fzf-man() {
-    manpage='echo {} |  awk -F"[()]" "{print \$2, \$1}" | xargs man'
+    manpage='echo {} |  awk -F"[()]" "{print \$2, \$1}" | MANPAGER=cat xargs man'
     batman="$manpage | bat --style=plain --language=man --color always --theme auto:system"
     _fzf-man-reload | fzf -q "$1" --ansi --style full --tiebreak=begin \
         --header 'alt-m: man(all), alt-(1-9): man(1-9), alt-t: tldr' \

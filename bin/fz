@@ -117,7 +117,7 @@ done
 [[ -z "$1" ]] && warn "Error: missing pattern"
 PATTERN="$1"
 
-FOLDERS=(~ ~/.local/share/scripts ~/.local/share/zsh/site-functions/dotfiles ~/.local/share/zsh-prompt)
+FOLDERS=(~ ~/.local/share/scripts ~/.local/share/zsh/site-functions/dotfiles ~/.local/share/zsh/prompt)
 OPTS=(--hidden --column --line-number --no-heading --color=always --smart-case)
 
 export _FZ_FOLDERS_STR="${(j:\0:)FOLDERS}"

@@ -109,20 +109,23 @@ echo "$(B Link):    $HOME/.local/bin"
 echo
 
 Q "Pull latest and build neovim nightly?"
-
 cd "$REPO" || exit
 pull_output=$(git pull)
 echo "$pull_output"
 if [[ "$pull_output" == "Already up to date." ]]; then
     Q "No changes from git pull. Proceed with build anyway?"
 fi
+
 info "$(B Making latest nightly build...)"
 rm -rf build
 make CMAKE_BUILD_TYPE=Release CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$NVIM_NIGHTLY"
+
 info "$(B "Removing $NVIM_NIGHTLY/lib and $NVIM_NIGHTLY/share...")"
 rm -rf "${NVIM_NIGHTLY:?}/lib"
 rm -rf "${NVIM_NIGHTLY:?}/share"
+
 info "$(B Installing latest nightly build...)"
 make install
+
 info "$(B Linking "$NVIM_NIGHTLY/bin/nvim -> $HOME/.local/bin")"
 ln -sf "$NVIM_NIGHTLY/bin/nvim" "$HOME/.local/bin"

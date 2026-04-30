@@ -15,14 +15,15 @@ Add `# shellcheck disable=SC2016` after the shebang to suppress warnings about t
 All scripts should include these standard utility functions at the top of the file
 in this order.
 
-- `U()` — Underline text (tput)
-- `B()` — Bold text (tput)
-- `I()` — Italic text (tput)
+- `U()` — Underline text
+- `B()` — Bold text
+- `I()` — Italic text
 - `Q()` — Yes/no confirmation prompt, exits on no
 - `ask()` — Prompt for free-form input, echoes reply
-- `msg()` — Print message to stderr in a given color (`$1`=message, `$2`=ANSI color code)
-- `info()` — Print message as blue notice to stderr (calls `msg` with blue)
-- `warn()` — Print red error to stderr and exit (calls `msg` with red; pass `-1` as second arg to return instead of exit)
+- `color()` — Wrap text in an ANSI color by name (`$1`=color name like `RED`, `BLUE`, `GREEN`, `YELLOW`, `CYAN`, `MAGENTA`; `$2..`=text)
+- `msg()` — Print message to stderr in a given color (`$1`=message, `$2`=color name, e.g. `RED`)
+- `info()` — Print message as blue notice to stderr (calls `msg` with `BLUE`)
+- `warn()` — Print red error to stderr and exit (calls `msg` with `RED`; pass `-1` as second arg to return instead of exit)
 - `argval()` — Validate that an option has a required argument
 - `noargs()` — Checks if number of arguments is zero, prints usage and exits
 - `usage()` — Prints how to use the shell script in man-page style
@@ -30,23 +31,11 @@ in this order.
 The functions are defined here:
 
 ```bash
-U() {
-    tput smul
-    printf '%s' "$*"
-    tput rmul
-}
+U() { printf '\e[4m%s\e[0m' "$*"; }
 
-B() {
-    tput bold
-    printf '%s' "$*"
-    tput sgr0
-}
+B() { printf '\e[1m%s\e[0m' "$*"; }
 
-I() {
-    tput sitm
-    printf '%s' "$*"
-    tput ritm
-}
+I() { printf '\e[3m%s\e[0m' "$*"; }
 
 Q() {
     read -r -p "$1 [y/n]: "
@@ -58,11 +47,26 @@ ask() {
     echo "$REPLY"
 }
 
-msg() { printf "\033[%sm%s\033[0m\n" "$2" "$1" >&2; }
+color() {
+    local name=$1; shift
+    local code
+    case $name in
+        RED)     code=31 ;;
+        GREEN)   code=32 ;;
+        YELLOW)  code=33 ;;
+        BLUE)    code=34 ;;
+        MAGENTA) code=35 ;;
+        CYAN)    code=36 ;;
+        *)       code=0  ;;
+    esac
+    printf '\e[%sm%s\e[0m' "$code" "$*"
+}
 
-info() { msg "$1" 34; }
+msg() { printf '%s\n' "$(color "$2" "$1")" >&2; }
 
-warn() { msg "$1" 31 && exit 1; }
+info() { msg "$1" BLUE; }
+
+warn() { msg "$1" RED && exit 1; }
 
 argval() {
     (($# < 2)) || [[ $2 = -* ]] && warn "Error: $1 requires a valid argument" || echo "$2"

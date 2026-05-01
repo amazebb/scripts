@@ -255,7 +255,7 @@
     <b>fz</b> - Search text interactively with ripgrep and fzf
 
 <b>SYNOPSIS</b>
-    <b>fz [-h] [-r option]</b> <u>pattern</u>
+    <b>fz [-h] [-l] [-i] [-g [true|false]] [-o option] [-r option]</b> <u>pattern</u> [<u>path</u>]
 
 <b>DESCRIPTION</b>
     Interactive text search across configured directories using ripgrep
@@ -263,31 +263,69 @@
     ripgrep and fzf filtering modes, opening results in nvim, and
     building quickfix lists from multiple selections.
 
+    If <u>path</u> is given, the search is restricted to that directory;
+    otherwise the built-in folder list is searched (see <b>-l</b>).
+
+    Folders marked <b>Git</b> by <b>-l</b> are inside a git work tree; for those,
+    only files tracked by the repo (git ls-files) are searched. All
+    other folders are searched in full with ripgrep.
+
 <b>OPTIONS</b>
     <b>-h</b>          Show this help message
 
-    <b>-r</b> <u>option</u>   Additional ripgrep option <i>(e.g., "-g *.pdf")</i>
+    <b>-l</b>          List the default search folders, one per line, and exit
+
+    <b>-g</b> [<u>bool</u>]   Restrict search to git-tracked files. Optional value
+                <b>true</b> or <b>false</b>; a bare <b>-g</b> means <b>true</b>. Without the
+                flag, defaults to <b>true</b> for the built-in folder list and
+                <b>false</b> when a manual <u>path</u> is given.
+
+    <b>-i</b>, <b>--ignore-git-dir</b>
+                Skip <b>.git</b> directories. Shorthand for <b>-o '-g=!.git'</b>.
+
+    <b>-o</b> <u>option</u>   Pass an arbitrary option through to ripgrep
+                <i>(e.g., -o '-g=!.git' to skip .git folders)</i>. May be
+                repeated.
+
+    <b>-r</b> <u>option</u>   Extend the ripgrep <b>--pre</b> preprocessor setup. Use
+                this to add more <b>--pre-glob</b> patterns so additional file
+                types are routed through <b>_pre-rg</b> before being searched
+                <i>(e.g., -r "--pre-glob=*.docx")</i>. Not a general passthrough
+                for arbitrary ripgrep flags.
 
 <b>KEYBINDINGS</b>
     <b>CTRL-T</b>      Switch between ripgrep and fzf filtering
     <b>ALT-A</b>       Select all results
     <b>ALT-D</b>       Deselect all results
     <b>CTRL-P</b>      Toggle preview pane
-    <b>ENTER</b>       Open in nvim (single selection) or quickfix (multi)
-    <b>CTRL-O</b>      Open in nvim without closing fzf
+    <b>ENTER</b>       Open in nvim (single) or quickfix (multi); returns to fzf
+    <b>CTRL-O</b>      Same as ENTER
 
 <b>EXAMPLES</b>
     Search for 'pattern' in all configured directories
 
         fz pattern
 
-    Search for 'pattern' only in PDF files
+    Search for 'pattern' under a specific directory
 
-        fz -r "-g '*.pdf'" pattern
+        fz pattern ~/projects/foo
+
+    Also preprocess .docx files through _pre-rg
+
+        fz -r "--pre-glob=*.docx" pattern
+
+    Skip .git folders while searching
+
+        fz -i pattern
+        fz -o "-g=!.git" pattern
 
     Search for a literal '-g'
 
         fz -- -g
+
+    List the default search folders
+
+        fz -l
 </pre>
 
 ## gitea-cli

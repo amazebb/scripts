@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 # Search text interactively with ripgrep and fzf
 
 # shellcheck disable=SC2016
@@ -20,16 +20,17 @@ ask() {
 }
 
 color() {
-    local name=$1; shift
+    local name=$1
+    shift
     local code
     case $name in
-        RED)     code=31 ;;
-        GREEN)   code=32 ;;
-        YELLOW)  code=33 ;;
-        BLUE)    code=34 ;;
-        MAGENTA) code=35 ;;
-        CYAN)    code=36 ;;
-        *)       code=0  ;;
+    RED) code=31 ;;
+    GREEN) code=32 ;;
+    YELLOW) code=33 ;;
+    BLUE) code=34 ;;
+    MAGENTA) code=35 ;;
+    CYAN) code=36 ;;
+    *) code=0 ;;
     esac
     printf '\e[%sm%s\e[0m' "$code" "$*"
 }
@@ -55,7 +56,7 @@ $(B NAME)
     $(B fz) - Search text interactively with ripgrep and fzf
 
 $(B SYNOPSIS)
-    $(B "fz [-h] [-r option]") $(U pattern)
+    $(B "fz [-h] [-l] [-r option]") $(U pattern) [$(U path)]
 
 $(B DESCRIPTION)
     Interactive text search across configured directories using ripgrep
@@ -63,8 +64,17 @@ $(B DESCRIPTION)
     ripgrep and fzf filtering modes, opening results in nvim, and
     building quickfix lists from multiple selections.
 
+    If $(U path) is given, the search is restricted to that directory;
+    otherwise the built-in folder list is searched (see $(B -l)).
+
+    Folders marked $(B Git) by $(B -l) are inside a git work tree; for those,
+    only files tracked by the repo (git ls-files) are searched. All
+    other folders are searched in full with ripgrep.
+
 $(B OPTIONS)
     $(B -h)          Show this help message
+
+    $(B -l)          List the default search folders, one per line, and exit
 
     $(B -r) $(U option)   Additional ripgrep option $(I '(e.g., "-g *.pdf")')
 
@@ -81,6 +91,10 @@ $(B EXAMPLES)
 
         fz pattern
 
+    Search for 'pattern' under a specific directory
+
+        fz pattern ~/projects/foo
+
     Search for 'pattern' only in PDF files
 
         fz -r "-g '*.pdf'" pattern
@@ -89,18 +103,32 @@ $(B EXAMPLES)
 
         fz -- -g
 
+    List the default search folders
+
+        fz -l
+
 EOF
 }
 
 noargs $#
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-PRE_RG=(--pre $SCRIPT_DIR/pre-rg --pre-glob '*.{pdf}')
+PRE_RG=(--pre "$SCRIPT_DIR/pre-rg" --pre-glob '*.{pdf}')
+FOLDERS=(~ ~/.local/share/scripts ~/.local/share/zsh/site-functions/dotfiles ~/.local/share/zsh/prompt)
+OPTS=(--hidden --column --line-number --no-heading --color=always --smart-case)
 
 # Parse arguments
 while (($#)); do
     case $1 in
     -h) usage && exit 0 ;;
+    -l)
+        for d in "${FOLDERS[@]}"; do
+            git -C "$d" rev-parse --is-inside-work-tree >/dev/null 2>&1 &&
+                printf '%s\tGit\n' "${d/#$HOME/\~}" ||
+                printf '%s\n' "${d/#$HOME/\~}"
+        done | column -t -s $'\t'
+        exit 0
+        ;;
     -r)
         PRE_RG+=("$(argval "$@")") || true
         shift
@@ -119,25 +147,24 @@ done
 
 [[ -z "$1" ]] && warn "Error: missing pattern"
 PATTERN="$1"
+[[ -n "$2" ]] && FOLDERS=("$2")
 
-FOLDERS=(~ ~/.local/share/scripts ~/.local/share/zsh/site-functions/dotfiles ~/.local/share/zsh/prompt)
-OPTS=(--hidden --column --line-number --no-heading --color=always --smart-case)
-
-export _FZ_FOLDERS_STR="${(j:\0:)FOLDERS}"
-export _FZ_PRE_RG_STR="${(j:\0:)PRE_RG}"
-export _FZ_OPTS_STR="${(j:\0:)OPTS}"
+export _FZ_FOLDERS_STR=$(printf '%q ' "${FOLDERS[@]}")
+export _FZ_PRE_RG_STR=$(printf '%q ' "${PRE_RG[@]}")
+export _FZ_OPTS_STR=$(printf '%q ' "${OPTS[@]}")
 export _FZ_GIT_TRACKED="true"
 
 rg_search() {
-    local folders=(${(s:\0:)_FZ_FOLDERS_STR})
-    local pre_rg=(${(s:\0:)_FZ_PRE_RG_STR})
-    local opts=(${(s:\0:)_FZ_OPTS_STR})
-    for d in ${folders[@]}; do
-        cd $d
+    local folders pre_rg opts d
+    eval "folders=($_FZ_FOLDERS_STR)"
+    eval "pre_rg=($_FZ_PRE_RG_STR)"
+    eval "opts=($_FZ_OPTS_STR)"
+    for d in "${folders[@]}"; do
+        cd "$d" || continue
         if [[ $_FZ_GIT_TRACKED == "true" ]] && dotfiles rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-            dotfiles ls-files | sed "s|^|$d/|g" | tr '\n' '\0' | xargs -0 rg $pre_rg[@] $opts[@] "$1" || :
+            dotfiles ls-files | sed "s|^|$d/|g" | tr '\n' '\0' | xargs -0 rg "${pre_rg[@]}" "${opts[@]}" "$1" || :
         else
-            rg $pre_rg[@] $opts[@] "$1" || :
+            rg "${pre_rg[@]}" "${opts[@]}" "$1" || :
         fi
     done
 }
@@ -163,5 +190,5 @@ ALT-A: Select-all, ALT-D: Deselect-all, CTRL-P: Toggle-preview' \
     --style full \
     --layout=reverse-list \
     --preview "$PREVIEW" \
-    --preview-window '~4,+{2}+4/3,<80(up)' \
+    --preview-window '~4,+{2}+4/3,50%,wrap-word,right,<50(up,85%,border-bottom)' \
     --query "$PATTERN"

@@ -56,7 +56,7 @@ $(B NAME)
     $(B fz) - Search text interactively with ripgrep and fzf
 
 $(B SYNOPSIS)
-    $(B "fz [-h] [-l] [-r option]") $(U pattern) [$(U path)]
+    $(B "fz [-h] [-l] [-i] [-g [true|false]] [-o option] [-r option]") $(U pattern) [$(U path)]
 
 $(B DESCRIPTION)
     Interactive text search across configured directories using ripgrep
@@ -76,7 +76,23 @@ $(B OPTIONS)
 
     $(B -l)          List the default search folders, one per line, and exit
 
-    $(B -r) $(U option)   Additional ripgrep option $(I '(e.g., "-g *.pdf")')
+    $(B -g) [$(U bool)]   Restrict search to git-tracked files. Optional value
+                $(B true) or $(B false); a bare $(B -g) means $(B true). Without the
+                flag, defaults to $(B true) for the built-in folder list and
+                $(B false) when a manual $(U path) is given.
+
+    $(B -i), $(B --ignore-git-dir)
+                Skip $(B .git) directories. Shorthand for $(B -o '-g=!.git').
+
+    $(B -o) $(U option)   Pass an arbitrary option through to ripgrep
+                $(I "(e.g., -o '-g=!.git' to skip .git folders)"). May be
+                repeated.
+
+    $(B -r) $(U option)   Extend the ripgrep $(B --pre) preprocessor setup. Use
+                this to add more $(B --pre-glob) patterns so additional file
+                types are routed through $(B _pre-rg) before being searched
+                $(I '(e.g., -r "--pre-glob=*.docx")'). Not a general passthrough
+                for arbitrary ripgrep flags.
 
 $(B KEYBINDINGS)
     $(B CTRL-T)      Switch between ripgrep and fzf filtering
@@ -95,9 +111,14 @@ $(B EXAMPLES)
 
         fz pattern ~/projects/foo
 
-    Search for 'pattern' only in PDF files
+    Also preprocess .docx files through _pre-rg
 
-        fz -r "-g '*.pdf'" pattern
+        fz -r "--pre-glob=*.docx" pattern
+
+    Skip .git folders while searching
+
+        fz -i pattern
+        fz -o "-g=!.git" pattern
 
     Search for a literal '-g'
 
@@ -115,7 +136,9 @@ noargs $#
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 PRE_RG=(--pre "$SCRIPT_DIR/_pre-rg" --pre-glob '*.{pdf}')
 FOLDERS=(~ ~/.local/share/scripts ~/.local/share/zsh/site-functions/dotfiles ~/.local/share/zsh/prompt)
-OPTS=(--hidden --column --line-number --no-heading --color=always --smart-case)
+OPTS=(--hidden --column --line-number --no-heading --color=always --smart-case --stats)
+GIT_TRACKED="true"
+GIT_EXPLICIT=""
 
 # Parse arguments
 while (($#)); do
@@ -128,6 +151,21 @@ while (($#)); do
                 printf '%s\n' "${d/#$HOME/\~}"
         done | column -t -s $'\t'
         exit 0
+        ;;
+    -g)
+        GIT_EXPLICIT="true"
+        if [[ $2 == "true" || $2 == "false" ]]; then
+            GIT_TRACKED="$2"
+            shift
+        else
+            GIT_TRACKED="true"
+        fi
+        ;;
+    -i | --ignore-git-dir) OPTS+=("-g=!.git") ;;
+    -o)
+        (($# < 2)) && warn "Error: -o requires a valid argument"
+        OPTS+=("$2")
+        shift
         ;;
     -r)
         PRE_RG+=("$(argval "$@")") || true
@@ -147,26 +185,30 @@ done
 
 [[ -z "$1" ]] && warn "Error: missing pattern"
 PATTERN="$1"
-[[ -n "$2" ]] && FOLDERS=("$2")
+if [[ -n "$2" ]]; then
+    FOLDERS=("$2")
+    [[ -z "$GIT_EXPLICIT" ]] && GIT_TRACKED="false"
+fi
 
 export _FZ_FOLDERS_STR=$(printf '%q ' "${FOLDERS[@]}")
 export _FZ_PRE_RG_STR=$(printf '%q ' "${PRE_RG[@]}")
 export _FZ_OPTS_STR=$(printf '%q ' "${OPTS[@]}")
-export _FZ_GIT_TRACKED="true"
+export _FZ_GIT_TRACKED="$GIT_TRACKED"
 
 rg_search() {
-    local folders pre_rg opts d
+    local folders pre_rg opts d f paths=()
     eval "folders=($_FZ_FOLDERS_STR)"
     eval "pre_rg=($_FZ_PRE_RG_STR)"
     eval "opts=($_FZ_OPTS_STR)"
     for d in "${folders[@]}"; do
         cd "$d" || continue
-        if [[ $_FZ_GIT_TRACKED == "true" ]] && dotfiles rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-            dotfiles ls-files | sed "s|^|$d/|g" | tr '\n' '\0' | xargs -0 rg "${pre_rg[@]}" "${opts[@]}" "$1" || :
+        if [[ $_FZ_GIT_TRACKED == "true" ]] && dotfiles --print-status >/dev/null 2>&1; then
+            while IFS= read -r f; do paths+=("$d/$f"); done < <(dotfiles ls-files)
         else
-            rg "${pre_rg[@]}" "${opts[@]}" "$1" || :
+            paths+=("$d")
         fi
     done
+    ((${#paths[@]})) && rg "${pre_rg[@]}" "${opts[@]}" "$1" "${paths[@]}" || :
 }
 
 RELOAD_CMD="$(typeset -f rg_search); rg_search {q}"

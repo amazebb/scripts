@@ -113,7 +113,7 @@ EOF
 noargs $#
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-PRE_RG=(--pre "$SCRIPT_DIR/pre-rg" --pre-glob '*.{pdf}')
+PRE_RG=(--pre "$SCRIPT_DIR/_pre-rg" --pre-glob '*.{pdf}')
 FOLDERS=(~ ~/.local/share/scripts ~/.local/share/zsh/site-functions/dotfiles ~/.local/share/zsh/prompt)
 OPTS=(--hidden --column --line-number --no-heading --color=always --smart-case)
 
@@ -173,7 +173,7 @@ RELOAD_CMD="$(typeset -f rg_search); rg_search {q}"
 RELOAD="reload:$RELOAD_CMD"
 OPENER='(( FZF_SELECT_COUNT == 0 )) && nvim {1} +{2} || nvim +cw -q {+f}'
 BAT_OPTS='--theme=TwoDark --style=full --wrap=character --color=always --highlight-line {2}'
-PREVIEW='case {1} in *.pdf) ~/.local/bin/pre-rg {1} | nl -ba -w1 -s" " | bat '"$BAT_OPTS"' ;; *) bat '"$BAT_OPTS"' {1} ;; esac'
+PREVIEW='case {1} in *.pdf) ~/.local/bin/_pre-rg {1} | nl -ba -w1 -s" " | bat '"$BAT_OPTS"' ;; *) bat '"$BAT_OPTS"' {1} ;; esac'
 
 fzf --disabled --ansi --multi \
     --bind "start:$RELOAD" --bind "change:$RELOAD" \

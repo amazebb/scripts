@@ -12,16 +12,17 @@ Q() {
 }
 
 color() {
-    local name=$1; shift
+    local name=$1
+    shift
     local code
     case $name in
-        RED)     code=31 ;;
-        GREEN)   code=32 ;;
-        YELLOW)  code=33 ;;
-        BLUE)    code=34 ;;
-        MAGENTA) code=35 ;;
-        CYAN)    code=36 ;;
-        *)       code=0  ;;
+    RED) code=31 ;;
+    GREEN) code=32 ;;
+    YELLOW) code=33 ;;
+    BLUE) code=34 ;;
+    MAGENTA) code=35 ;;
+    CYAN) code=36 ;;
+    *) code=0 ;;
     esac
     printf '\e[%sm%s\e[0m' "$code" "$*"
 }
@@ -81,8 +82,6 @@ done
 
 # Directory to search for script
 DIR=${1:-$HOME/.local/share/scripts/bin}
-
-Q "List scripts in $DIR"
 
 # Find all shell script files and process them
 A=(NAME)

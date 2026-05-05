@@ -26,7 +26,7 @@ export NNN_PLUG='p:preview-tui'
 # Use `tmux` split as preview
 if [ -e "${TMUX%%,*}" ]; then
     # Preview command
-    tmux split-window -e "NNN_FIFO=$NNN_FIFO" -dh nnn_preview_cmd
+    tmux split-window -e "NNN_FIFO=$NNN_FIFO" -dh _nnn_preview
 fi
 
 nnn -d -G -a -Pp "$@"

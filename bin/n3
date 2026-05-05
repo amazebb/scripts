@@ -1,11 +1,89 @@
-#!/usr/bin/env dash
-# Launch nnn with preview in tmux
+#!/usr/bin/env bash
+# shellcheck disable=SC2016
 
-# Block nesting of nnn in subshells
-[ "${NNNLVL:-0}" -eq 0 ] || {
-    echo "nnn is already running"
-    return
+U() { printf '\e[4m%s\e[0m' "$*"; }
+
+B() { printf '\e[1m%s\e[0m' "$*"; }
+
+I() { printf '\e[3m%s\e[0m' "$*"; }
+
+Q() {
+    read -r -p "$1 [y/n]: "
+    [[ ! $REPLY =~ [Yy] ]] && echo "Aborted." && exit 1
 }
+
+ask() {
+    read -r -p "$1: "
+    echo "$REPLY"
+}
+
+color() {
+    local name=$1; shift
+    local code
+    case $name in
+        RED)     code=31 ;;
+        GREEN)   code=32 ;;
+        YELLOW)  code=33 ;;
+        BLUE)    code=34 ;;
+        MAGENTA) code=35 ;;
+        CYAN)    code=36 ;;
+        *)       code=0  ;;
+    esac
+    printf '\e[%sm%s\e[0m' "$code" "$*"
+}
+
+msg() { printf '%s\n' "$(color "$2" "$1")" >&2; }
+
+info() { msg "$1" BLUE; }
+
+warn() { msg "$1" RED && exit 1; }
+
+argval() {
+    (($# < 2)) || [[ $2 = -* ]] && warn "Error: $1 requires a valid argument" || echo "$2"
+}
+
+noargs() { ((!$1)) && info "Error: no arguments provided" && usage && exit 1; }
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B n3) - Launch nnn with tmux preview pane
+
+$(B SYNOPSIS)
+    $(B "n3 [-h]") [$(U nnn-args)...]
+
+$(B DESCRIPTION)
+    Launches $(B nnn) with the preview-tui plugin in a tmux split pane.
+    Refuses to run when already inside an nnn subshell. Any extra
+    arguments are forwarded to $(B nnn).
+
+    On quit, cds into the directory $(B nnn) was last in via $(I NNN_TMPFILE).
+
+$(B OPTIONS)
+    $(B -h)    Show this help message
+
+$(B EXAMPLES)
+    Open in current directory
+
+        n3
+
+    Open at a specific path
+
+        n3 ~/projects
+
+EOF
+}
+
+while (($#)); do
+    case $1 in
+        -h) usage; exit 0 ;;
+        --) shift; break ;;
+        *)  break ;;
+    esac
+    shift
+done
+
+[[ ${NNNLVL:-0} -eq 0 ]] || warn "nnn is already running"
 
 # The default behaviour is to cd on quit (nnn checks if NNN_TMPFILE is set)
 # If NNN_TMPFILE is set to a custom path, it must be exported for nnn to see.
@@ -13,7 +91,6 @@
 #     NNN_TMPFILE="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/.lastd"
 export NNN_TMPFILE="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/.lastd"
 
-# This will create a fifo where all nnn selections will be written to
 NNN_FIFO="$(mktemp -t nnn.XXXXXX -u)"
 export NNN_FIFO
 (
@@ -23,16 +100,14 @@ export NNN_FIFO
 
 export NNN_PLUG='p:preview-tui'
 
-# Use `tmux` split as preview
-if [ -e "${TMUX%%,*}" ]; then
-    # Preview command
+if [[ -e ${TMUX%%,*} ]]; then
     tmux split-window -e "NNN_FIFO=$NNN_FIFO" -dh _nnn_preview
 fi
 
 nnn -d -G -a -Pp "$@"
 
 # shellcheck source=/dev/null
-[ ! -f "$NNN_TMPFILE" ] || {
+[[ ! -f $NNN_TMPFILE ]] || {
     . "$NNN_TMPFILE"
     rm -f -- "$NNN_TMPFILE" >/dev/null
 }

@@ -52,7 +52,7 @@ $(B NAME)
     $(B fext) - Tally files by extension
 
 $(B SYNOPSIS)
-    $(B "fext [-h] [-t type] [-s column]") [$(U path)]
+    $(B "fext [-h] [-b] [-t type] [-s column]") [$(U path)]
 
 $(B DESCRIPTION)
     Recursively tally files by extension under $(U path) $(I '(default: .)'),
@@ -82,12 +82,12 @@ EOF
 
 type=f
 col=1
-size_fmt=$'%z\t%N'
+use_blocks=0
 
 while (($#)); do
     case $1 in
         -h) usage; exit 0 ;;
-        -b) size_fmt=$'%b\t%N' ;;
+        -b) use_blocks=1 ;;
         -t) type=$(argval "$@"); shift ;;
         -s) col=$(argval "$@"); shift ;;
         --) shift; break ;;
@@ -102,8 +102,18 @@ path=${1:-.}
 [[ -e $path ]] || warn "Error: path does not exist: $path"
 [[ $col =~ ^[123]$ ]] || warn "Error: -s must be 1, 2, or 3"
 
-find "$path" -type "$type" -exec stat -f "$size_fmt" {} + |
-    awk -F'\t' -v blk="$([[ $size_fmt == *%b* ]] && echo 512 || echo 1)" '{
+if stat --version >/dev/null 2>&1; then
+    # GNU coreutils stat
+    size_fmt=$([[ $use_blocks = 1 ]] && echo $'%b\t%n' || echo $'%s\t%n')
+    stat_args=(-c "$size_fmt")
+else
+    # BSD/macOS stat
+    size_fmt=$([[ $use_blocks = 1 ]] && echo $'%b\t%N' || echo $'%z\t%N')
+    stat_args=(-f "$size_fmt")
+fi
+
+find "$path" -type "$type" -exec stat "${stat_args[@]}" {} + |
+    awk -F'\t' -v blk="$([[ $use_blocks = 1 ]] && echo 512 || echo 1)" '{
         n = split($2, p, "/"); name = p[n]
         m = match(name, /\.[^.]+$/)
         key = (m > 1) ? tolower(substr(name, m + 1)) : name

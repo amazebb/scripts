@@ -59,7 +59,7 @@ $(B DESCRIPTION)
     original indentation is preserved while still allowing inline formatting
     to render in markdown viewers.
 
-    The tput-helper calls are rewritten inline: $(I '\$(B x)') becomes
+    The formatting helper calls are rewritten inline: $(I '\$(B x)') becomes
     $(I '<b>x</b>'), $(I '\$(U x)') becomes $(I '<u>x</u>'), and
     $(I '\$(I x)') becomes $(I '<i>x</i>'). Surrounding single or double
     quotes around the argument are stripped.

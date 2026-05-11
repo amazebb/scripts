@@ -13,6 +13,7 @@
 - [gitea-cli](#gitea-cli)
 - [iplot](#iplot)
 - [list-scripts](#list-scripts)
+- [n3](#n3)
 - [rawsync](#rawsync)
 - [shtoc](#shtoc)
 - [shtomd](#shtomd)
@@ -190,7 +191,7 @@
     <b>fext</b> - Tally files by extension
 
 <b>SYNOPSIS</b>
-    <b>fext [-h] [-t type] [-s column]</b> [<u>path</u>]
+    <b>fext [-h] [-b] [-t type] [-s column]</b> [<u>path</u>]
 
 <b>DESCRIPTION</b>
     Recursively tally files by extension under <u>path</u> <i>(default: .)</i>,
@@ -425,6 +426,35 @@
         list-scripts -c
 </pre>
 
+## n3
+
+<pre>
+<b>NAME</b>
+    <b>n3</b> - Launch nnn with tmux preview pane
+
+<b>SYNOPSIS</b>
+    <b>n3 [-h]</b> [<u>nnn-args</u>...]
+
+<b>DESCRIPTION</b>
+    Launches <b>nnn</b> with the preview-tui plugin in a tmux split pane.
+    Refuses to run when already inside an nnn subshell. Any extra
+    arguments are forwarded to <b>nnn</b>.
+
+    On quit, cds into the directory <b>nnn</b> was last in via <i>NNN_TMPFILE</i>.
+
+<b>OPTIONS</b>
+    <b>-h</b>    Show this help message
+
+<b>EXAMPLES</b>
+    Open in current directory
+
+        n3
+
+    Open at a specific path
+
+        n3 ~/projects
+</pre>
+
 ## rawsync
 
 <pre>
@@ -542,7 +572,7 @@
     original indentation is preserved while still allowing inline formatting
     to render in markdown viewers.
 
-    The tput-helper calls are rewritten inline: <i>$(B x)</i> becomes
+    The formatting helper calls are rewritten inline: <i>$(B x)</i> becomes
     <i>&lt;b&gt;x&lt;/b&gt;</i>, <i>$(U x)</i> becomes <i>&lt;u&gt;x&lt;/u&gt;</i>, and
     <i>$(I x)</i> becomes <i>&lt;i&gt;x&lt;/i&gt;</i>. Surrounding single or double
     quotes around the argument are stripped.

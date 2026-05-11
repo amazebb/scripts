@@ -2,6 +2,8 @@
 
 Contains a repository of useful, semi-useful and somewhat less useful scripts 
 
+Most of these are bash scripts tested within the macOS environment.
+
 See [TOC](TOC.md) for per-script usage
 
 ## Install

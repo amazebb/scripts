@@ -18,7 +18,7 @@
 - [shtoc](#shtoc)
 - [shtomd](#shtomd)
 
-## build-nvim-nightly
+## [build-nvim-nightly](https://github.com/amazebb/scripts/blob/master/bin/build-nvim-nightly)
 
 <pre>
 <b>NAME</b>
@@ -48,7 +48,7 @@
         build-nvim-nightly -r ~/src/neovim -d ~/.local/nvim-nightly
 </pre>
 
-## data-backup
+## [data-backup](https://github.com/amazebb/scripts/blob/master/bin/data-backup)
 
 <pre>
 <b>NAME</b>
@@ -80,7 +80,7 @@
             ~/Library/Mobile\ Documents/com~apple~CloudDocs/SPARSE.sparsebundle
 </pre>
 
-## dedupe
+## [dedupe](https://github.com/amazebb/scripts/blob/master/bin/dedupe)
 
 <pre>
 <b>NAME</b>
@@ -113,7 +113,7 @@
         dedupe -e arw .
 </pre>
 
-## disk-useage
+## [disk-useage](https://github.com/amazebb/scripts/blob/master/bin/disk-useage)
 
 <pre>
 <b>NAME</b>
@@ -146,7 +146,7 @@
         disk-useage -d 2 -e ./Lib* ./Trash* -v
 </pre>
 
-## exifmv
+## [exifmv](https://github.com/amazebb/scripts/blob/master/bin/exifmv)
 
 <pre>
 <b>NAME</b>
@@ -184,7 +184,7 @@
         exifmv -d '%Y-%m' /Volumes/SD/DCIM
 </pre>
 
-## fext
+## [fext](https://github.com/amazebb/scripts/blob/master/bin/fext)
 
 <pre>
 <b>NAME</b>
@@ -217,7 +217,7 @@
         fext -t d /tmp
 </pre>
 
-## fix-symlinks
+## [fix-symlinks](https://github.com/amazebb/scripts/blob/master/bin/fix-symlinks)
 
 <pre>
 <b>NAME</b>
@@ -249,7 +249,7 @@
         fix-symlinks /Volumes/Backup
 </pre>
 
-## fz
+## [fz](https://github.com/amazebb/scripts/blob/master/bin/fz)
 
 <pre>
 <b>NAME</b>
@@ -329,7 +329,7 @@
         fz -l
 </pre>
 
-## gitea-cli
+## [gitea-cli](https://github.com/amazebb/scripts/blob/master/bin/gitea-cli)
 
 <pre>
 <b>NAME</b>
@@ -360,7 +360,7 @@
         gitea-cli log
 </pre>
 
-## iplot
+## [iplot](https://github.com/amazebb/scripts/blob/master/bin/iplot)
 
 <pre>
 <b>NAME</b>
@@ -402,7 +402,7 @@
         cat data.txt | iplot -s linespoints -t "My Data"
 </pre>
 
-## list-scripts
+## [list-scripts](https://github.com/amazebb/scripts/blob/master/bin/list-scripts)
 
 <pre>
 <b>NAME</b>
@@ -426,7 +426,7 @@
         list-scripts -c
 </pre>
 
-## n3
+## [n3](https://github.com/amazebb/scripts/blob/master/bin/n3)
 
 <pre>
 <b>NAME</b>
@@ -455,7 +455,7 @@
         n3 ~/projects
 </pre>
 
-## rawsync
+## [rawsync](https://github.com/amazebb/scripts/blob/master/bin/rawsync)
 
 <pre>
 <b>NAME</b>
@@ -525,7 +525,7 @@
         rawsync -c "/Volumes/PHOTOS/RAW/raw-by-day"
 </pre>
 
-## shtoc
+## [shtoc](https://github.com/amazebb/scripts/blob/master/bin/shtoc)
 
 <pre>
 <b>NAME</b>
@@ -557,7 +557,7 @@
         shtoc . &gt; scripts.md
 </pre>
 
-## shtomd
+## [shtomd](https://github.com/amazebb/scripts/blob/master/bin/shtomd)
 
 <pre>
 <b>NAME</b>

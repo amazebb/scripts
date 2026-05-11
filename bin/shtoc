@@ -132,5 +132,5 @@ printf '\n'
 for entry in "${rendered[@]}"; do
     name=${entry%%$'\x1f'*}
     body=${entry#*$'\x1f'}
-    printf '## %s\n\n%s\n\n' "$name" "$body"
+    printf '## [%s](https://github.com/amazebb/scripts/blob/master/bin/%s)\n\n%s\n\n' "$name" "$name" "$body"
 done

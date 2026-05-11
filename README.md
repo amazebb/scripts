@@ -2,6 +2,8 @@
 
 Contains a repository of useful, semi-useful and somewhat less useful scripts 
 
+See [TOC](TOC.md) for per-script usage
+
 ## Install
 
 Clone into `~/.local/share` and run the install script to symlink all scripts into `~/.local/bin`:
@@ -18,7 +20,6 @@ Make sure `~/.local/bin` is in your `$PATH`. Add this to your `~/.bashrc` or `~/
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
-See [TOC](TOC.md) for per-script usage
 
 ## Disclaimer
 

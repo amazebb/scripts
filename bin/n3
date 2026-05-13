@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Launch nnn with tmux preview pane
+
 # shellcheck disable=SC2016
 # shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
@@ -35,9 +37,15 @@ EOF
 
 while (($#)); do
     case $1 in
-        -h) usage; exit 0 ;;
-        --) shift; break ;;
-        *)  break ;;
+    -h)
+        usage
+        exit 0
+        ;;
+    --)
+        shift
+        break
+        ;;
+    *) break ;;
     esac
     shift
 done

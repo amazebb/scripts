@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Generate a single markdown document with a TOC of shell script usages
+
 # shellcheck disable=SC2016
 # shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"

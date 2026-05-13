@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # List scripts with descriptions in $HOME/.local/share/scripts/bin
+
 # shellcheck disable=SC2016
 # shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"

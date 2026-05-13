@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Plot functions in the Kitty terminal using gnuplot
+
 # shellcheck disable=SC2016
 # shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"

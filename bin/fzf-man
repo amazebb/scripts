@@ -6,13 +6,14 @@
 # TODO consider adding GNI info, eg: `info coreutils "$1" invocation 2>/dev/null`
 fzf-man() {
     manpage='echo {} |  awk -F"[()]" "{print \$2, \$1}" | MANPAGER=cat xargs man'
-    batman="$manpage | bat --style=plain --language=man --color always --theme auto:system"
+    manopen='echo {} |  awk -F"[()]" "{print \$2, \$1}" | xargs man'
+    batman="$manpage | col -b | bat --style=plain --language=man --color always --theme auto:system"
     _fzf-man-reload | fzf -q "$1" --ansi --style full --tiebreak=begin \
         --header 'alt-m: man(all), alt-(1-9): man(1-9), alt-t: tldr' \
         --prompt='man > ' \
         --preview-window '50%,wrap-word,<50(up,85%,border-bottom)' \
         --preview "$batman" \
-        --bind "enter:execute($manpage)" \
+        --bind "enter:execute($manopen)" \
         --bind "alt-m:+reload(_fzf-man-reload)+change-preview(${batman})+change-prompt(man > )" \
         --bind "alt-1:+reload(_fzf-man-reload 1)+change-preview(${batman})+change-prompt(man(1) General Commands > )" \
         --bind "alt-2:+reload(_fzf-man-reload 2)+change-preview(${batman})+change-prompt(man(2) System Calls > )" \

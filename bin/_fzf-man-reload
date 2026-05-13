@@ -1,12 +1,8 @@
 #!/usr/bin/env zsh
 # Helper function used by fzf-man
 
-cyan=$(tput setaf 6)
-blue=$(tput setaf 4)
-res=$(tput sgr0)
-bld=$(tput bold)
-
 { (($#)) && apropos -s "$1" . || man -k .; } |
     awk -F' - ' '!seen[$1]++' |
     sort -r |
-    awk -v cyan="$cyan" -v blue="$blue" -v res="$res" -v bld="$bld" '{ $1=cyan bld $1; $2=res blue $2; } 1'
+    # \033[36;1m = cyan + bold, \033[0m = reset, \033[34m = blue
+    awk '{ $1="\033[36;1m" $1; $2="\033[0m\033[34m" $2; } 1'

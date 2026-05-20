@@ -83,6 +83,12 @@ if [[ "$pull_output" == "Already up to date." ]]; then
     Q "No changes from git pull. Proceed with build anyway?"
 fi
 
+if ! command -v cmake &>/dev/null; then
+    info "cmake is not installed"
+    Q "Install cmake via brew?"
+    brew install cmake || warn "cmake install failed"
+fi
+
 info "$(B Making latest nightly build...)"
 rm -rf build
 make CMAKE_BUILD_TYPE=Release CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$NVIM_NIGHTLY"

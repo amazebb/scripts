@@ -63,8 +63,8 @@ done
 REPO="${var[-r]}"
 NVIM_NIGHTLY="${var[-d]}"
 
-if [[ ! -d "$REPO" ]]; then
-    info "Repo directory not found: $REPO"
+if [[ ! -d "$REPO" || ! -d "$REPO/.git" ]]; then
+    info "No git repo found at: $REPO"
     Q "Clone neovim into $REPO?"
     mkdir -p "$(dirname "$REPO")"
     git clone https://github.com/neovim/neovim "$REPO" || warn "Clone failed"

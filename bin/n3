@@ -52,6 +52,12 @@ done
 
 [[ ${NNNLVL:-0} -eq 0 ]] || warn "nnn is already running"
 
+# undim inactive kitty windows so the preview pane is readable
+if [ -n "$KITTY_WINDOW_ID" ]; then
+    kitten @ load-config --override inactive_text_alpha=1.0 2>/dev/null
+    trap 'kitten @ load-config 2>/dev/null' EXIT INT TERM
+fi
+
 # The default behaviour is to cd on quit (nnn checks if NNN_TMPFILE is set)
 # If NNN_TMPFILE is set to a custom path, it must be exported for nnn to see.
 # To cd on quit only on ^G, remove the "export" and set NNN_TMPFILE *exactly* as this:
@@ -78,5 +84,11 @@ nnn -d -G -a -Pp "$@"
     . "$NNN_TMPFILE"
     rm -f -- "$NNN_TMPFILE" >/dev/null
 }
+
+# restore original config to restore inactive window text dimming
+if [ -n "$KITTY_WINDOW_ID" ]; then
+    kitten @ load-config 2>/dev/null
+    trap - EXIT INT TERM
+fi
 
 rm -f "$NNN_FIFO"

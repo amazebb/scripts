@@ -75,6 +75,11 @@ $(B EXAMPLES)
         fz -i pattern
         fz -o "-g=!.git" pattern
 
+    Search for just Project.toml files with an empty pattern ''.
+    Skipping .git(-i), .vscode, and .julia folders.
+
+        fz -i -o "-g=Project.toml" -o "-g=\!.julia" -o "-g=\!.vscode" -o "--files" '' ~/
+
     Search for a literal '-g'
 
         fz -- -g
@@ -138,7 +143,8 @@ while (($#)); do
     shift
 done
 
-[[ -z "$1" ]] && warn "Error: missing pattern"
+# Count args rather than test emptiness, so an explicit '' is a valid pattern
+(($# == 0)) && warn "Error: missing pattern"
 PATTERN="$1"
 if [[ -n "$2" ]]; then
     FOLDERS=("$2")

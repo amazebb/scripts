@@ -146,6 +146,9 @@ done
 # Count args rather than test emptiness, so an explicit '' is a valid pattern
 (($# == 0)) && warn "Error: missing pattern"
 PATTERN="$1"
+# rg --files lists names instead of matches, so fzf is driven differently
+FILES_MODE="false"
+for o in "${OPTS[@]}"; do [[ $o == "--files" ]] && FILES_MODE="true"; done
 if [[ -n "$2" ]]; then
     FOLDERS=("$2")
     [[ -z "$GIT_EXPLICIT" ]] && GIT_TRACKED="false"
@@ -155,6 +158,7 @@ export _FZ_FOLDERS_STR=$(printf '%q ' "${FOLDERS[@]}")
 export _FZ_PRE_RG_STR=$(printf '%q ' "${PRE_RG[@]}")
 export _FZ_OPTS_STR=$(printf '%q ' "${OPTS[@]}")
 export _FZ_GIT_TRACKED="$GIT_TRACKED"
+export _FZ_FILES="$FILES_MODE"
 
 rg_search() {
     local folders pre_rg opts d f paths=()
@@ -169,14 +173,21 @@ rg_search() {
             paths+=("$d")
         fi
     done
-    ((${#paths[@]})) && rg "${pre_rg[@]}" "${opts[@]}" "$1" "${paths[@]}" || :
+    ((${#paths[@]})) || return 0
+    # --files takes no pattern; a stray one would be read as another path
+    if [[ $_FZ_FILES == "true" ]]; then
+        rg "${opts[@]}" "${paths[@]}" || :
+    else
+        rg "${pre_rg[@]}" "${opts[@]}" "$1" "${paths[@]}" || :
+    fi
 }
 
 RELOAD_CMD="$(typeset -f rg_search); rg_search {q}"
 RELOAD="reload:$RELOAD_CMD"
 OPENER='(( FZF_SELECT_COUNT == 0 )) && nvim {1} +{2} || nvim +cw -q {+f}'
-BAT_OPTS='--theme=TwoDark --style=full --wrap=character --color=always --highlight-line {2}'
-PREVIEW='case {1} in *.pdf) ~/.local/bin/_pre-rg {1} | nl -ba -w1 -s" " | bat '"$BAT_OPTS"' ;; *) bat '"$BAT_OPTS"' {1} ;; esac'
+BAT_OPTS='--theme=TwoDark --style=full --wrap=character --color=always $HL'
+# --files output has no line number, so bat the whole file with nothing highlighted
+PREVIEW='HL={2}; HL=${HL:+--highlight-line $HL}; case {1} in *.pdf) ~/.local/bin/_pre-rg {1} | nl -ba -w1 -s" " | bat '"$BAT_OPTS"' ;; *) bat '"$BAT_OPTS"' {1} ;; esac'
 
 fzf --disabled --ansi --multi \
     --bind "start:$RELOAD" --bind "change:$RELOAD" \

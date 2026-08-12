@@ -14,9 +14,11 @@ $(B SYNOPSIS)
     $(B "n3 [-h]") [$(U nnn-args)...]
 
 $(B DESCRIPTION)
-    Launches $(B nnn) with the preview-tui plugin in a tmux split pane.
-    Refuses to run when already inside an nnn subshell. Any extra
-    arguments are forwarded to $(B nnn).
+    Launches $(B nnn) with the preview-tui plugin in a split pane.
+    In Ghostty, starts a tmux session first so preview-tui can open
+    a pane (Kitty uses native splits). Refuses to run when already
+    inside an nnn subshell. Any extra arguments are forwarded to
+    $(B nnn).
 
     On quit, cds into the directory $(B nnn) was last in via $(I NNN_TMPFILE).
 
@@ -61,7 +63,6 @@ fi
 # The default behaviour is to cd on quit (nnn checks if NNN_TMPFILE is set)
 # If NNN_TMPFILE is set to a custom path, it must be exported for nnn to see.
 # To cd on quit only on ^G, remove the "export" and set NNN_TMPFILE *exactly* as this:
-#     NNN_TMPFILE="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/.lastd"
 export NNN_TMPFILE="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/.lastd"
 
 NNN_FIFO="$(mktemp -t nnn.XXXXXX -u)"
@@ -73,11 +74,18 @@ export NNN_FIFO
 
 export NNN_PLUG='p:preview-tui'
 
-if [[ -e ${TMUX%%,*} ]]; then
-    tmux split-window -e "NNN_FIFO=$NNN_FIFO" -dh _nnn_preview
+# Ghostty has no native split for preview-tui. Run nnn inside tmux so
+# the plugin can open a preview pane. Skip if already in tmux.
+if [[ -z $TMUX && $TERM_PROGRAM == ghostty ]]; then
+    command -v tmux >/dev/null || warn "tmux is required for preview pane in Ghostty"
+    tmux new-session -c "$PWD" -- env \
+        NNN_FIFO="$NNN_FIFO" \
+        NNN_TMPFILE="$NNN_TMPFILE" \
+        NNN_PLUG="$NNN_PLUG" \
+        nnn -d -G -a -Pp "$@"
+else
+    nnn -d -G -a -Pp "$@"
 fi
-
-nnn -d -G -a -Pp "$@"
 
 # shellcheck source=/dev/null
 [[ ! -f $NNN_TMPFILE ]] || {

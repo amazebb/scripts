@@ -2,6 +2,8 @@
 
 Personal shell script collection located in `bin/`.
 
+Keep replies short. Do not narrate alternatives, tradeoffs, or why a check exists unless asked.
+
 ## Bash Script Style Guide
 
 When creating or modifying bash scripts in this project, follow these conventions:
@@ -50,9 +52,11 @@ $(B DESCRIPTION)
     Longer description of what the script does.
 
 $(B OPTIONS)
-    $(B -h)        Show this help message
+    $(B -h)           Show this help message
 
-    $(B -f) $(U val)   Description $(I '(default: something)')
+    $(B -f) $(U val)      Description $(I '(default: something)')
+
+    [$(U positional)]  Description $(I '(default: something)')
 
 $(B EXAMPLES)
     Example description
@@ -62,6 +66,8 @@ $(B EXAMPLES)
 EOF
 }
 ```
+
+List every flag and every bare positional in OPTIONS. Wrap optional arguments in square brackets in both SYNOPSIS and OPTIONS (`[-h]`, `[$(U color)]`).
 
 ### Argument Parsing
 

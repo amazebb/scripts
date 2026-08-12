@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+# Cycle Ghostty themes in the current session
+
+# shellcheck disable=SC2016
+# shellcheck source=common.sh
+source "$(dirname "$0")/common.sh"
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B ghostty-theme) - Cycle Ghostty themes in the current session
+
+$(B SYNOPSIS)
+    $(B "ghostty-theme [-h]") [$(U color)]
+
+$(B DESCRIPTION)
+    Lists Ghostty themes and cycles them live in the current terminal.
+    Colors apply to this session only; nothing is written to the
+    Ghostty config.
+
+    Keys: $(B j) / $(B k) or arrows to cycle, $(B Enter) to keep,
+    $(B q) to quit.
+
+$(B OPTIONS)
+    $(B -h)         Show this help message
+
+    [$(U color)]    $(B all), $(B dark), or $(B light) $(I '(default: all)')
+
+$(B EXAMPLES)
+    Cycle all themes
+
+        ghostty-theme
+
+    Cycle dark themes only
+
+        ghostty-theme dark
+
+EOF
+}
+
+while (($#)); do
+    case $1 in
+    -h)
+        usage
+        exit 0
+        ;;
+    --)
+        shift
+        break
+        ;;
+    -*)
+        warn "Unknown option: $1"
+        ;;
+    *) break ;;
+    esac
+    shift
+done
+
+COLOR=${1:-all}
+[[ -n $1 ]] && shift
+(($#)) && warn "Unknown argument: $1"
+
+case $COLOR in
+all | dark | light) ;;
+*) warn "Invalid color: $COLOR (all, dark, light)" ;;
+esac
+
+command -v ghostty >/dev/null || warn "ghostty not found"
+
+mapfile -t themes < <(
+    ghostty +list-themes --color="$COLOR" --plain 2>/dev/null |
+        sed 's/ (resources)//; s/ (user)//; s/^[[:space:]]*//; s/[[:space:]]*$//' |
+        grep -v '^$'
+)
+
+((${#themes[@]})) || warn "No themes found."
+
+idx=0
+total=${#themes[@]}
+
+find_theme_file() {
+    local name="$1"
+    for dir in \
+        "$HOME/.config/ghostty/themes" \
+        "/Applications/Ghostty.app/Contents/Resources/ghostty/themes"; do
+        [[ -d $dir ]] || continue
+        local f
+        f=$(find "$dir" -iname "${name}" -type f 2>/dev/null | head -1)
+        [[ -n $f ]] && {
+            echo "$f"
+            return
+        }
+    done
+}
+
+apply_theme() {
+    local name="$1"
+    local theme_file
+    theme_file=$(find_theme_file "$name")
+
+    if [[ -z $theme_file || ! -f $theme_file ]]; then
+        printf '\r\033[K%s' "$(color RED "Theme file not found: $name")"
+        return
+    fi
+
+    while IFS= read -r line || [[ -n $line ]]; do
+        if [[ $line =~ ^[[:space:]]*palette[[:space:]]*=[[:space:]]*([0-9]+)[[:space:]]*=[[:space:]]*#?([0-9a-fA-F]{6}) ]]; then
+            printf '\e]4;%s;#%s\a' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+        elif [[ $line =~ ^[[:space:]]*background[[:space:]]*=[[:space:]]*#?([0-9a-fA-F]{6}) ]]; then
+            printf '\e]11;#%s\a' "${BASH_REMATCH[1]}"
+        elif [[ $line =~ ^[[:space:]]*foreground[[:space:]]*=[[:space:]]*#?([0-9a-fA-F]{6}) ]]; then
+            printf '\e]10;#%s\a' "${BASH_REMATCH[1]}"
+        fi
+    done <"$theme_file"
+}
+
+show_current() {
+    printf '\r\033[KCurrent: %s  (%s/%s)' \
+        "$(color GREEN "${themes[$idx]}")" "$((idx + 1))" "$total"
+}
+
+info "j / k  or  ↑ / ↓   to cycle"
+info "Enter = keep    q = quit"
+show_current
+
+apply_theme "${themes[$idx]}"
+
+while true; do
+    IFS= read -rsn1 key || continue
+
+    case "$key" in
+    $'\x1b')
+        read -rsn2 -t 0.05 seq || seq=""
+        case "$seq" in
+        "[A" | "[D") idx=$(((idx - 1 + total) % total)) ;;
+        "[B" | "[C") idx=$(((idx + 1) % total)) ;;
+        *)
+            echo
+            exit 0
+            ;;
+        esac
+        apply_theme "${themes[$idx]}"
+        show_current
+        ;;
+    j)
+        idx=$(((idx + 1) % total))
+        apply_theme "${themes[$idx]}"
+        show_current
+        ;;
+    k)
+        idx=$(((idx - 1 + total) % total))
+        apply_theme "${themes[$idx]}"
+        show_current
+        ;;
+    "")
+        echo
+        info "Kept current colors (session only)."
+        exit 0
+        ;;
+    q | Q)
+        echo
+        exit 0
+        ;;
+    esac
+done

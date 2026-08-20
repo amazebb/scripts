@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launch nnn with tmux preview pane
+# Launch nnn with preview-tui (Ghostty native split, or tmux)
 
 # shellcheck disable=SC2016
 # shellcheck source=common.sh
@@ -8,27 +8,33 @@ source "$(dirname "$0")/common.sh"
 usage() {
     cat <<EOF
 $(B NAME)
-    $(B n3) - Launch nnn with tmux preview pane
+    $(B n3) - Launch nnn with preview-tui
 
 $(B SYNOPSIS)
-    $(B "n3 [-h]") [$(U nnn-args)...]
+    $(B "n3 [-h] [-t]") [$(U nnn-args)...]
 
 $(B DESCRIPTION)
-    Launches $(B nnn) with the preview-tui plugin in a split pane.
-    In Ghostty, starts a tmux session first so preview-tui can open
-    a pane (Kitty uses native splits). Refuses to run when already
-    inside an nnn subshell. Any extra arguments are forwarded to
-    $(B nnn).
+    Launches $(B nnn) with the preview-tui plugin.
+    In Ghostty 1.3+, preview-tui opens a native split (Cmd+D /
+    new_split:right) via a dedicated AppleScript. Kitty uses native
+    splits. Pass $(B -t) or set $(B N3_TMUX=1) to wrap nnn in tmux
+    instead. Refuses to run when already inside an nnn subshell.
+    Extra arguments are forwarded to $(B nnn).
 
     On quit, cds into the directory $(B nnn) was last in via $(I NNN_TMPFILE).
 
 $(B OPTIONS)
     $(B -h)    Show this help message
+    $(B -t)    Use tmux for the preview split (also $(B N3_TMUX=1))
 
 $(B EXAMPLES)
     Open in current directory
 
         n3
+
+    Open with a tmux preview split
+
+        n3 -t
 
     Open at a specific path
 
@@ -37,11 +43,18 @@ $(B EXAMPLES)
 EOF
 }
 
+use_tmux=0
+[[ -n ${N3_TMUX:-} ]] && use_tmux=1
+
 while (($#)); do
     case $1 in
     -h)
         usage
         exit 0
+        ;;
+    -t)
+        use_tmux=1
+        shift
         ;;
     --)
         shift
@@ -49,7 +62,6 @@ while (($#)); do
         ;;
     *) break ;;
     esac
-    shift
 done
 
 [[ ${NNNLVL:-0} -eq 0 ]] || warn "nnn is already running"
@@ -74,10 +86,10 @@ export NNN_FIFO
 
 export NNN_PLUG='p:preview-tui'
 
-# Ghostty has no native split for preview-tui. Run nnn inside tmux so
-# the plugin can open a preview pane. Skip if already in tmux.
-if [[ -z $TMUX && $TERM_PROGRAM == ghostty ]]; then
-    command -v tmux >/dev/null || warn "tmux is required for preview pane in Ghostty"
+# Default: nnn in this terminal; preview-tui uses Ghostty AppleScript
+# (or kitty/wezterm). -t / N3_TMUX=1 wraps nnn in tmux instead.
+if [[ $use_tmux -eq 1 && -z ${TMUX:-} ]]; then
+    command -v tmux >/dev/null || warn "tmux is required for n3 -t"
     tmux new-session -c "$PWD" -- env \
         NNN_FIFO="$NNN_FIFO" \
         NNN_TMPFILE="$NNN_TMPFILE" \
@@ -85,6 +97,15 @@ if [[ -z $TMUX && $TERM_PROGRAM == ghostty ]]; then
         nnn -dYGaPp "$@"
 else
     nnn -dYGaPp "$@"
+fi
+
+plugdir="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/plugins"
+if [[ -f $plugdir/preview-ghostty-close.applescript ]]; then
+    for idfile in "${TMPDIR:-/tmp}"/nnn-preview-tui-ghosttyid.*; do
+        [[ -f $idfile ]] || continue
+        osascript "$plugdir/preview-ghostty-close.applescript" "$(cat "$idfile")" >/dev/null 2>&1
+        rm -f -- "$idfile"
+    done
 fi
 
 # shellcheck source=/dev/null

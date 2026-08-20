@@ -82,9 +82,9 @@ if [[ -z $TMUX && $TERM_PROGRAM == ghostty ]]; then
         NNN_FIFO="$NNN_FIFO" \
         NNN_TMPFILE="$NNN_TMPFILE" \
         NNN_PLUG="$NNN_PLUG" \
-        nnn -d -G -a -Pp "$@"
+        nnn -dYGaPp "$@"
 else
-    nnn -d -G -a -Pp "$@"
+    nnn -dYGaPp "$@"
 fi
 
 # shellcheck source=/dev/null

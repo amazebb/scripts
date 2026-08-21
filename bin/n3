@@ -94,9 +94,9 @@ if [[ $use_tmux -eq 1 && -z ${TMUX:-} ]]; then
         NNN_FIFO="$NNN_FIFO" \
         NNN_TMPFILE="$NNN_TMPFILE" \
         NNN_PLUG="$NNN_PLUG" \
-        nnn -dYGaPp "$@"
+        nnn -dIYGaPp "$@"
 else
-    nnn -dYGaPp "$@"
+    nnn -dIYGaPp "$@"
 fi
 
 plugdir="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/plugins"

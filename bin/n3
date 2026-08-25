@@ -102,12 +102,12 @@ fi
 # Close leftover Ghostty preview splits. n3 is often sourced from zsh
 # (alias n='source n3'); an unmatched glob there is NOMATCH, not a skip.
 plugdir="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/plugins"
-if [[ -f $plugdir/preview-ghostty-close.applescript ]]; then
+if [[ -f $plugdir/ghostty/preview-ghostty-close.applescript ]]; then
     tmpdir="${TMPDIR:-/tmp}"
     tmpdir="${tmpdir%/}"
-    find "$tmpdir" -maxdepth 1 -name 'nnn-preview-tui-ghosttyid.*' -type f -print0 2>/dev/null \
-        | while IFS= read -r -d '' idfile; do
-            osascript "$plugdir/preview-ghostty-close.applescript" "$(tr -d '\n' < "$idfile")" >/dev/null 2>&1
+    find "$tmpdir" -maxdepth 1 -name 'nnn-preview-tui-ghosttyid.*' -type f -print0 2>/dev/null |
+        while IFS= read -r -d '' idfile; do
+            osascript "$plugdir/ghostty/preview-ghostty-close.applescript" "$(tr -d '\n' <"$idfile")" >/dev/null 2>&1
             rm -f -- "$idfile"
         done
 fi

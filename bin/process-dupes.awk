@@ -88,25 +88,26 @@ function pretty_bytes(sz) {
     else printf("%d Bi\n", sz)
 }
 
-function sort_arrays(_sorted_count, _sorted_files, _sorted_sizes, i) {
+# Trailing parameters are locals; _i avoids shadowing the global i
+function sort_arrays(_sorted_count, _sorted_files, _sorted_sizes, _i) {
     n = asorti(count, s, "@val_num_asc")
 
     # Sorted associative array:
-    for (i = 1; i <= n; i++) {
-        k = s[i]
-        _sorted_files[i] = files[k]
-        _sorted_sizes[i] = sizes[k]
-        _sorted_count[i] = count[k]
+    for (_i = 1; _i <= n; _i++) {
+        k = s[_i]
+        _sorted_files[_i] = files[k]
+        _sorted_sizes[_i] = sizes[k]
+        _sorted_count[_i] = count[k]
     }
 
     delete files
     delete count
     delete sizes
 
-    for (i = 1; i <= n; i++) {
-        count[i] = _sorted_count[i]
-        files[i] = _sorted_files[i]
-        sizes[i] = _sorted_sizes[i]
+    for (_i = 1; _i <= n; _i++) {
+        count[_i] = _sorted_count[_i]
+        files[_i] = _sorted_files[_i]
+        sizes[_i] = _sorted_sizes[_i]
     }
 }
 

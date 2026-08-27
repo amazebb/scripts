@@ -27,7 +27,9 @@ $(B OPTIONS)
            bash, sh, dash, ksh   $(B "shellcheck -x") $(I '(-x follows sourced files)')
            zsh                   $(B "zsh -n"), a syntax check only, as
                                  $(B shellcheck) cannot parse zsh
-           awk                   $(B "gawk --lint"), filtered to warnings
+           awk                   $(B "gawk --lint=no-ext"), filtered to
+                                 warnings. $(I no-ext) permits gawk
+                                 extensions, which the scripts here rely on
 
 $(B EXAMPLES)
     List all scripts and check for any issues
@@ -74,7 +76,7 @@ D=(STATUS)
 check_scripts() {
     local output
     case $2 in
-    awk) output=$(gawk --lint -f "$1" </dev/null 2>&1 | grep -i warning) ;;
+    awk) output=$(gawk --lint=no-ext -f "$1" </dev/null 2>&1 | grep -i warning) ;;
     zsh) output=$(zsh -n "$1" 2>&1) ;;
     bash | sh | dash | ksh) output=$(shellcheck -x "$1" 2>/dev/null) ;;
     *) output= ;;

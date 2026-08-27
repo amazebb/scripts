@@ -465,7 +465,9 @@
            bash, sh, dash, ksh   <b>shellcheck -x</b> <i>(-x follows sourced files)</i>
            zsh                   <b>zsh -n</b>, a syntax check only, as
                                  <b>shellcheck</b> cannot parse zsh
-           awk                   <b>gawk --lint</b>, filtered to warnings
+           awk                   <b>gawk --lint=no-ext</b>, filtered to
+                                 warnings. <i>no-ext</i> permits gawk
+                                 extensions, which the scripts here rely on
 
 <b>EXAMPLES</b>
     List all scripts and check for any issues

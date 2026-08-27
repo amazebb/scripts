@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  local.netmon - launchd agent for the `netmon` script.
+
+  Runs netmon at login and every 60 seconds thereafter, appending one TSV row
+  per probe to ~/netmon/probes.csv. Errors go to ~/netmon/netmon.err.
+
+  This file is the master copy. It does nothing where it sits; it must be
+  copied to ~/Library/LaunchAgents/ to be active.
+
+    install / start
+      cp launchd/local.netmon.plist ~/Library/LaunchAgents/
+      launchctl bootstrap gui/$UID ~/Library/LaunchAgents/local.netmon.plist
+
+    status / run now
+      launchctl print gui/$UID/local.netmon
+      launchctl kickstart -p gui/$UID/local.netmon
+
+    stop (leaves the plist installed)
+      launchctl bootout gui/$UID/local.netmon
+
+    remove completely
+      launchctl bootout gui/$UID/local.netmon
+      rm ~/Library/LaunchAgents/local.netmon.plist
+
+  Edits are not picked up while loaded: bootout, re-copy, bootstrap again.
+  See launchd/README.md for the full notes.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>local.netmon</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/boris/.local/share/scripts/bin/netmon</string>
+    <string>-f</string><string>csv</string>
+  </array>
+  <key>StartInterval</key><integer>60</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardErrorPath</key><string>/Users/boris/netmon/netmon.err</string>
+</dict>
+</plist>

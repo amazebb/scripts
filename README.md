@@ -23,6 +23,21 @@ Make sure `~/.local/bin` is in your `$PATH`. Add this to your `~/.bashrc` or `~/
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
+## Scheduled jobs
+
+Some scripts are meant to run on a schedule. macOS uses `launchd` for this, and
+the agent definitions live in [launchd/](launchd/).
+
+They are opt-in, since installing one starts a recurring background job, so
+`install.sh` leaves them alone. Install and load them with:
+
+```bash
+./install-agents.sh
+```
+
+Re-running it replaces an agent even while it is loaded or mid-run. See
+[launchd/README.md](launchd/README.md) for checking, stopping and removing them.
+
 ## Disclaimer
 
 Usual disclaimer of no guarantees, that you kind of know what you're doing, and read the source

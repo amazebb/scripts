@@ -10,7 +10,7 @@ and want a predictable, safe way to get them into long-term storage without
 losing a file, duplicating a file, or breaking your date-browsing folder.
 
 **Prerequisite**: `dedupe` shells out to
-[broeknbytes/rapidhash](https://github.com/broeknbytes/rapidhash) for the
+[amazebb/rapidhash](https://github.com/amazebb/rapidhash) for the
 actual hashing step. Install it first — see that repo's README. The rest of
 the scripts rely on standard tools (`rsync`, `exiftool`, `gdate`).
 
@@ -85,7 +85,7 @@ so you keep one real copy and reclaim the space without breaking any
 reference that expects the file to exist at its old path.
 
 The hashing itself is done by
-[broeknbytes/rapidhash](https://github.com/broeknbytes/rapidhash), chosen
+[amazebb/rapidhash](https://github.com/amazebb/rapidhash), chosen
 because RAW files are large (often 40–80 MB each) and a RAW archive can run
 to tens of thousands of them. rapidhash is throughput-oriented and
 parallelised (`dedupe` invokes it with `-j 40`), so hashing a full archive

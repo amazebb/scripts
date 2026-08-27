@@ -12,7 +12,7 @@ Clone into `~/.local/share` and run the install script to symlink all scripts in
 
 ```bash
 mkdir -p ~/.local/share
-git clone --depth 1 https://github.com/broeknbytes/scripts.git ~/.local/share/scripts
+git clone --depth 1 https://github.com/amazebb/scripts.git ~/.local/share/scripts
 cd ~/.local/share/scripts
 ./install.sh
 ```

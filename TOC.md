@@ -10,10 +10,12 @@
 - [fext](#fext)
 - [fix-symlinks](#fix-symlinks)
 - [fz](#fz)
+- [ghostty-theme](#ghostty-theme)
 - [gitea-cli](#gitea-cli)
 - [iplot](#iplot)
 - [list-scripts](#list-scripts)
 - [n3](#n3)
+- [netmon](#netmon)
 - [rawsync](#rawsync)
 - [shtoc](#shtoc)
 - [shtomd](#shtomd)
@@ -320,6 +322,11 @@
         fz -i pattern
         fz -o "-g=!.git" pattern
 
+    Search for just Project.toml files with an empty pattern ''.
+    Skipping .git(-i), .vscode, and .julia folders.
+
+        fz -i -o "-g=Project.toml" -o "-g=\!.julia" -o "-g=\!.vscode" -o "--files" '' ~/
+
     Search for a literal '-g'
 
         fz -- -g
@@ -327,6 +334,38 @@
     List the default search folders
 
         fz -l
+</pre>
+
+## [ghostty-theme](https://github.com/amazebb/scripts/blob/master/bin/ghostty-theme)
+
+<pre>
+<b>NAME</b>
+    <b>ghostty-theme</b> - Cycle Ghostty themes in the current session
+
+<b>SYNOPSIS</b>
+    <b>ghostty-theme [-h]</b> [<u>color</u>]
+
+<b>DESCRIPTION</b>
+    Lists Ghostty themes and cycles them live in the current terminal.
+    Colors apply to this session only; nothing is written to the
+    Ghostty config.
+
+    Keys: <b>j</b> / <b>k</b> or arrows to cycle, <b>Enter</b> to keep,
+    <b>q</b> to quit.
+
+<b>OPTIONS</b>
+    <b>-h</b>         Show this help message
+
+    [<u>color</u>]    <b>all</b>, <b>dark</b>, or <b>light</b> <i>(default: all)</i>
+
+<b>EXAMPLES</b>
+    Cycle all themes
+
+        ghostty-theme
+
+    Cycle dark themes only
+
+        ghostty-theme dark
 </pre>
 
 ## [gitea-cli](https://github.com/amazebb/scripts/blob/master/bin/gitea-cli)
@@ -430,29 +469,104 @@
 
 <pre>
 <b>NAME</b>
-    <b>n3</b> - Launch nnn with tmux preview pane
+    <b>n3</b> - Launch nnn with preview-tui
 
 <b>SYNOPSIS</b>
-    <b>n3 [-h]</b> [<u>nnn-args</u>...]
+    <b>n3 [-h] [-t]</b> [<u>nnn-args</u>...]
 
 <b>DESCRIPTION</b>
-    Launches <b>nnn</b> with the preview-tui plugin in a tmux split pane.
-    Refuses to run when already inside an nnn subshell. Any extra
-    arguments are forwarded to <b>nnn</b>.
+    Launches <b>nnn</b> with the preview-tui plugin.
+    In Ghostty 1.3+, preview-tui opens a native split (Cmd+D /
+    new_split:right) via a dedicated AppleScript. Kitty uses native
+    splits. Pass <b>-t</b> or set <b>N3_TMUX=1</b> to wrap nnn in tmux
+    instead. Refuses to run when already inside an nnn subshell.
+    Extra arguments are forwarded to <b>nnn</b>.
 
     On quit, cds into the directory <b>nnn</b> was last in via <i>NNN_TMPFILE</i>.
 
 <b>OPTIONS</b>
     <b>-h</b>    Show this help message
+    <b>-t</b>    Use tmux for the preview split (also <b>N3_TMUX=1</b>)
 
 <b>EXAMPLES</b>
     Open in current directory
 
         n3
 
+    Open with a tmux preview split
+
+        n3 -t
+
     Open at a specific path
 
         n3 ~/projects
+</pre>
+
+## [netmon](https://github.com/amazebb/scripts/blob/master/bin/netmon)
+
+<pre>
+<b>NAME</b>
+    <b>netmon</b> - Probe gateway, WAN and DNS health and log the results
+
+<b>SYNOPSIS</b>
+    <b>netmon [-h] [-f fmt] [-s sep] [-o file] [-i secs] [-n count] [-r]</b>
+    <b>       [-g gateway] [-w wan] [-d resolver] [-q name]</b>
+
+<b>DESCRIPTION</b>
+    Pings the LAN gateway and a public WAN address, then queries the
+    local DNS resolver, and appends one record per run to a log file.
+
+    Records are written as <i>NDJSON</i> (one JSON object per line) or as
+    delimited text. Both formats append; the file and, for <b>csv</b>, its
+    header row are created on first run.
+
+<b>OPTIONS</b>
+    <b>-h</b>           Show this help message
+
+    <b>-f</b> <u>fmt</u>      Output format, <b>json</b> or <b>csv</b> <i>(default: json)</i>
+
+    <b>-s</b> <u>sep</u>      Field separator for <b>csv</b> <i>(default: TAB)</i>
+
+    <b>-o</b> <u>file</u>     Log file <i>(default: ~/netmon/probes.ndjson, or probes.csv)</i>
+
+    <b>-i</b> <u>secs</u>     Repeat every <u>secs</u> seconds instead of running once
+
+    <b>-n</b> <u>count</u>    Stop after <u>count</u> runs <i>(default: unlimited)</i>
+
+    <b>-r</b>           Reset the log first, keeping the <b>csv</b> header
+
+    <b>-g</b> <u>gateway</u>  LAN gateway to ping <i>(default: 192.168.1.1)</i>
+
+    <b>-w</b> <u>wan</u>      WAN address to ping <i>(default: 9.9.9.9)</i>
+
+    <b>-d</b> <u>resolver</u> DNS resolver to query <i>(default: 192.168.1.21)</i>
+
+    <b>-q</b> <u>name</u>     Name to resolve <i>(default: cloudflare.com)</i>
+
+<b>EXAMPLES</b>
+    Single JSON probe appended to the default log
+
+        netmon
+
+    Tab separated log, reset before starting
+
+        netmon -f csv -r
+
+    Comma separated, every 60 seconds, to a custom file
+
+        netmon -f csv -s , -i 60 -o ~/netmon/probes.csv
+
+    Ten probes, one every 5 seconds
+
+        netmon -i 5 -n 10
+
+<b>SCHEDULING</b>
+    Use <b>-i</b> for an ad-hoc foreground loop.
+
+    To run in the background on a schedule, install the <b>launchd</b> agent
+    <b>local.netmon</b>. Its plist and the instructions for installing,
+    checking, stopping and removing it live in
+    <i>~/.local/share/scripts/launchd/</i>.
 </pre>
 
 ## [rawsync](https://github.com/amazebb/scripts/blob/master/bin/rawsync)

@@ -2,7 +2,6 @@
 # Tally files by extension, sorted by count, size, or extension
 
 # shellcheck disable=SC2016
-# shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 
 usage() {

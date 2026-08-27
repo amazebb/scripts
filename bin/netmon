@@ -2,7 +2,6 @@
 # Probe LAN gateway, WAN and DNS health; append results to a log
 
 # shellcheck disable=SC2016,SC2088
-# shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 
 set -u

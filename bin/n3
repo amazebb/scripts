@@ -2,7 +2,6 @@
 # Launch nnn with preview-tui (Ghostty native split, or tmux)
 
 # shellcheck disable=SC2016
-# shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 
 usage() {

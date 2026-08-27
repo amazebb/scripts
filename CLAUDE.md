@@ -4,6 +4,18 @@ Personal shell script collection located in `bin/`.
 
 Keep replies short. Do not narrate alternatives, tradeoffs, or why a check exists unless asked.
 
+## Commit Messages
+
+Use a conventional commit subject (`feat(scope): ...`, `fix`, `chore`, `docs`) followed by a blank line and a bullet point for each change. Do not write the body as prose paragraphs.
+
+```
+feat(netmon): add csv output
+
+- add -f json|csv with -s to set the csv separator
+- create the csv header when the log file is new
+- append to the existing log on every run
+```
+
 ## Bash Script Style Guide
 
 When creating or modifying bash scripts in this project, follow these conventions:
@@ -12,12 +24,19 @@ When creating or modifying bash scripts in this project, follow these convention
 
 Add `# shellcheck disable=SC2016` after the shebang to suppress warnings about the `$()` in the `usage()` heredoc.
 
-### Utility Functions
-
-All scripts source shared utility functions from [common.sh](bin\common.sh) in the same directory. Add this line after the shebang and shellcheck disable comment:
+Run ShellCheck with `-x` so it follows sourced files:
 
 ```bash
-# shellcheck source=common.sh
+shellcheck -x bin/some-script
+```
+
+`.shellcheckrc` sets `source-path=SCRIPTDIR`, so `common.sh` is resolved relative to the script rather than the working directory. No `# shellcheck source=` directive is needed for the usual `common.sh` line — only when the path cannot be reduced to a filename next to the script, as in `install-agents.sh`.
+
+### Utility Functions
+
+All scripts source shared utility functions from [common.sh](bin/common.sh) in the same directory. Add this line after the shebang and shellcheck disable comment:
+
+```bash
 source "$(dirname "$0")/common.sh"
 ```
 

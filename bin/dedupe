@@ -2,7 +2,6 @@
 # Find duplicate files and offer to create symlinks
 
 # shellcheck disable=SC2016
-# shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 
 usage() {

@@ -1,0 +1,4 @@
+# Resolve `# shellcheck source=` directives relative to the script being
+# checked, not the working directory, so `shellcheck -x` finds bin/common.sh
+# from anywhere.
+source-path=SCRIPTDIR

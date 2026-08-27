@@ -2,7 +2,6 @@
 # List scripts with descriptions in $HOME/.local/share/scripts/bin
 
 # shellcheck disable=SC2016
-# shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 
 usage() {
@@ -63,7 +62,8 @@ D=(STATUS)
 
 check_scripts() {
     if [[ ! "$1" =~ \.[^/]*$ ]]; then
-        output=$(shellcheck "$1" 2>/dev/null)
+        # -x follows sourced files, so common.sh does not trip SC1091
+        output=$(shellcheck -x "$1" 2>/dev/null)
     elif [[ "$1" =~ \.awk ]]; then
         output=$(gawk --lint -f "$1" </dev/null 2>&1 | grep -i warning)
     fi

@@ -457,7 +457,15 @@
 <b>OPTIONS</b>
     <b>-h</b> Show this help message
 
-    <b>-c</b> Check for any issues
+    <b>-c</b> Check for any issues, marking a script <b>WARN</b> when its
+       checker reports anything. The checker depends on the file type
+       shown in the <b>SHELL</b> column, since one linter does not cover
+       them all:
+
+           bash, sh, dash, ksh   <b>shellcheck -x</b> <i>(-x follows sourced files)</i>
+           zsh                   <b>zsh -n</b>, a syntax check only, as
+                                 <b>shellcheck</b> cannot parse zsh
+           awk                   <b>gawk --lint</b>, filtered to warnings
 
 <b>EXAMPLES</b>
     List all scripts and check for any issues

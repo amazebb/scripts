@@ -19,7 +19,15 @@ $(B DESCRIPTION)
 $(B OPTIONS)
     $(B -h) Show this help message
 
-    $(B -c) Check for any issues
+    $(B -c) Check for any issues, marking a script $(B WARN) when its
+       checker reports anything. The checker depends on the file type
+       shown in the $(B SHELL) column, since one linter does not cover
+       them all:
+
+           bash, sh, dash, ksh   $(B "shellcheck -x") $(I '(-x follows sourced files)')
+           zsh                   $(B "zsh -n"), a syntax check only, as
+                                 $(B shellcheck) cannot parse zsh
+           awk                   $(B "gawk --lint"), filtered to warnings
 
 $(B EXAMPLES)
     List all scripts and check for any issues
@@ -60,13 +68,17 @@ B=(SHELL)
 C=(DESCRIPTION)
 D=(STATUS)
 
+# $1=script, $2=shell as reported in the SHELL column.
+# zsh gets a syntax check only, as ShellCheck cannot parse it. For the
+# rest, -x follows sourced files so common.sh does not trip SC1091.
 check_scripts() {
-    if [[ ! "$1" =~ \.[^/]*$ ]]; then
-        # -x follows sourced files, so common.sh does not trip SC1091
-        output=$(shellcheck -x "$1" 2>/dev/null)
-    elif [[ "$1" =~ \.awk ]]; then
-        output=$(gawk --lint -f "$1" </dev/null 2>&1 | grep -i warning)
-    fi
+    local output
+    case $2 in
+    awk) output=$(gawk --lint -f "$1" </dev/null 2>&1 | grep -i warning) ;;
+    zsh) output=$(zsh -n "$1" 2>&1) ;;
+    bash | sh | dash | ksh) output=$(shellcheck -x "$1" 2>/dev/null) ;;
+    *) output= ;;
+    esac
     [[ -n "$output" ]] && echo "WARN" || echo " "
 }
 
@@ -75,18 +87,19 @@ while read -r script; do
     A+=("$(basename "$script")")
 
     if [[ "$script" =~ \.awk ]]; then
-        B+=(awk)
+        shell="awk"
     else
         # Determine script type from shebang or vim modeline
         first_line=$(head -n 1 "$script")
         if [[ "$first_line" == "#!"* ]]; then
-            B+=("${first_line//#!\/usr\/bin\/env /}")
+            shell="${first_line//#!\/usr\/bin\/env /}"
         elif [[ "$first_line" =~ vim:.*ft=([a-z]+) ]]; then
-            B+=("${BASH_REMATCH[1]}")
+            shell="${BASH_REMATCH[1]}"
         else
-            B+=("unknown")
+            shell="unknown"
         fi
     fi
+    B+=("$shell")
 
     # Extract the first comment line that starts with # (ignoring shebang and # vim:)
     desc=$(grep -v -E '^#(!| ?vim:)' "$script" | head -n 1 | sed 's/^# *//')
@@ -96,7 +109,7 @@ while read -r script; do
     C+=("$desc")
 
     if ((CHECK)); then
-        status=$(check_scripts "$script")
+        status=$(check_scripts "$script" "$shell")
         D+=("$status")
     fi
 done < <(find "$DIR" -type f -depth 1 | sort -k1)

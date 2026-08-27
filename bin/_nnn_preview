@@ -37,7 +37,8 @@ print_bin_info() {
 while read -r selection; do
     clear
     lines=$(($(tput lines) - 1))
-    cols=$(tput cols)
+    # only needed by the commented-out cut/tail variants below
+    # cols=$(tput cols)
     # nlines=5
 
     # Print directory tree

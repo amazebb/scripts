@@ -153,9 +153,10 @@ if [[ -n "$2" ]]; then
     [[ -z "$GIT_EXPLICIT" ]] && GIT_TRACKED="false"
 fi
 
-export _FZ_FOLDERS_STR=$(printf '%q ' "${FOLDERS[@]}")
-export _FZ_PRE_RG_STR=$(printf '%q ' "${PRE_RG[@]}")
-export _FZ_OPTS_STR=$(printf '%q ' "${OPTS[@]}")
+_FZ_FOLDERS_STR=$(printf '%q ' "${FOLDERS[@]}")
+_FZ_PRE_RG_STR=$(printf '%q ' "${PRE_RG[@]}")
+_FZ_OPTS_STR=$(printf '%q ' "${OPTS[@]}")
+export _FZ_FOLDERS_STR _FZ_PRE_RG_STR _FZ_OPTS_STR
 export _FZ_GIT_TRACKED="$GIT_TRACKED"
 export _FZ_FILES="$FILES_MODE"
 

@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+# Probe LAN gateway, WAN and DNS health; append results to a log
+
+# shellcheck disable=SC2016,SC2088
+# shellcheck source=common.sh
+source "$(dirname "$0")/common.sh"
+
+set -u
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B netmon) - Probe gateway, WAN and DNS health and log the results
+
+$(B SYNOPSIS)
+    $(B "netmon [-h] [-f fmt] [-s sep] [-o file] [-i secs] [-n count] [-r]")
+    $(B "       [-g gateway] [-w wan] [-d resolver] [-q name]")
+
+$(B DESCRIPTION)
+    Pings the LAN gateway and a public WAN address, then queries the
+    local DNS resolver, and appends one record per run to a log file.
+
+    Records are written as $(I NDJSON) (one JSON object per line) or as
+    delimited text. Both formats append; the file and, for $(B csv), its
+    header row are created on first run.
+
+$(B OPTIONS)
+    $(B -h)           Show this help message
+
+    $(B -f) $(U fmt)      Output format, $(B json) or $(B csv) $(I '(default: json)')
+
+    $(B -s) $(U sep)      Field separator for $(B csv) $(I '(default: TAB)')
+
+    $(B -o) $(U file)     Log file $(I '(default: ~/netmon/probes.ndjson, or probes.csv)')
+
+    $(B -i) $(U secs)     Repeat every $(U secs) seconds instead of running once
+
+    $(B -n) $(U count)    Stop after $(U count) runs $(I '(default: unlimited)')
+
+    $(B -r)           Reset the log first, keeping the $(B csv) header
+
+    $(B -g) $(U gateway)  LAN gateway to ping $(I '(default: 192.168.1.1)')
+
+    $(B -w) $(U wan)      WAN address to ping $(I '(default: 9.9.9.9)')
+
+    $(B -d) $(U resolver) DNS resolver to query $(I '(default: 192.168.1.21)')
+
+    $(B -q) $(U name)     Name to resolve $(I '(default: cloudflare.com)')
+
+$(B EXAMPLES)
+    Single JSON probe appended to the default log
+
+        netmon
+
+    Tab separated log, reset before starting
+
+        netmon -f csv -r
+
+    Comma separated, every 60 seconds, to a custom file
+
+        netmon -f csv -s , -i 60 -o ~/netmon/probes.csv
+
+    Ten probes, one every 5 seconds
+
+        netmon -i 5 -n 10
+
+$(B SCHEDULING)
+    Use $(B -i) for an ad-hoc foreground loop.
+
+    To run in the background on a schedule, install the $(B launchd) agent
+    $(B local.netmon). Its plist and the instructions for installing,
+    checking, stopping and removing it live in
+    $(I '~/.local/share/scripts/launchd/').
+EOF
+}
+
+gateway=192.168.1.1
+wan_addr=9.9.9.9
+resolver=192.168.1.21
+qname=cloudflare.com
+
+fmt=json
+sep=$'\t'
+logfile=
+interval=
+count=0
+reset=0
+
+while (($#)); do
+    case $1 in
+    -h)
+        usage
+        exit 0
+        ;;
+    -f)
+        fmt=$(argval "$@")
+        shift 2
+        ;;
+    -s)
+        sep=$(argval "$@")
+        shift 2
+        ;;
+    -o)
+        logfile=$(argval "$@")
+        shift 2
+        ;;
+    -i)
+        interval=$(argval "$@")
+        shift 2
+        ;;
+    -n)
+        count=$(argval "$@")
+        shift 2
+        ;;
+    -r)
+        reset=1
+        shift
+        ;;
+    -g)
+        gateway=$(argval "$@")
+        shift 2
+        ;;
+    -w)
+        wan_addr=$(argval "$@")
+        shift 2
+        ;;
+    -d)
+        resolver=$(argval "$@")
+        shift 2
+        ;;
+    -q)
+        qname=$(argval "$@")
+        shift 2
+        ;;
+    --)
+        shift
+        break
+        ;;
+    -*) warn "Unknown option: $1" ;;
+    *) break ;;
+    esac
+done
+
+[[ $fmt = json || $fmt = csv ]] || warn "Error: -f must be json or csv"
+[[ -z $interval || $interval =~ ^[0-9]+$ ]] || warn "Error: -i must be a whole number of seconds"
+[[ $count =~ ^[0-9]+$ ]] || warn "Error: -n must be a whole number"
+
+if [[ -z $logfile ]]; then
+    if [[ $fmt = json ]]; then
+        logfile="$HOME/netmon/probes.ndjson"
+    else
+        logfile="$HOME/netmon/probes.csv"
+    fi
+fi
+
+mkdir -p "$(dirname "$logfile")" || warn "Error: cannot create $(dirname "$logfile")"
+
+((reset)) && : >"$logfile"
+
+# csv gets a header when the file is new or empty
+if [[ $fmt = csv && ! -s $logfile ]]; then
+    printf '%s\n' "ts${sep}orbi_ms${sep}wan_ms${sep}dns_ok${sep}dns_ms" >>"$logfile"
+fi
+
+rtt() { # ms, or "null"
+    local o
+    o=$(/sbin/ping -c 1 -W 2000 "$1" 2>/dev/null |
+        /usr/bin/awk -F'time=' '/time=/{print $2+0; exit}')
+    [[ -n $o ]] && echo "$o" || echo "null"
+}
+
+probe() {
+    local ts orbi wan d dns_ok dns_ms
+    ts=$(/bin/date -u +%Y-%m-%dT%H:%M:%SZ)
+    orbi=$(rtt "$gateway")
+    wan=$(rtt "$wan_addr")
+
+    # DNS resolution health — separate signal from raw reachability
+    d=$(/usr/bin/dig +time=2 +tries=1 "@$resolver" "$qname" A 2>/dev/null)
+    if echo "$d" | /usr/bin/grep -q 'ANSWER SECTION'; then
+        dns_ok=true
+        dns_ms=$(echo "$d" | /usr/bin/awk '/Query time/{print $4}')
+    else
+        dns_ok=false
+        dns_ms=null
+    fi
+
+    if [[ $fmt = json ]]; then
+        printf '{"ts":"%s","orbi_ms":%s,"wan_ms":%s,"dns_ok":%s,"dns_ms":%s}\n' \
+            "$ts" "$orbi" "$wan" "$dns_ok" "$dns_ms" >>"$logfile"
+    else
+        printf '%s\n' \
+            "${ts}${sep}${orbi}${sep}${wan}${sep}${dns_ok}${sep}${dns_ms}" \
+            >>"$logfile"
+    fi
+}
+
+if [[ -z $interval ]]; then
+    probe
+    exit 0
+fi
+
+trap 'exit 0' INT TERM
+
+runs=0
+while :; do
+    probe
+    runs=$((runs + 1))
+    ((count)) && ((runs >= count)) && break
+    sleep "$interval"
+done

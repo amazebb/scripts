@@ -93,9 +93,9 @@ if [[ $use_tmux -eq 1 && -z ${TMUX:-} ]]; then
         NNN_FIFO="$NNN_FIFO" \
         NNN_TMPFILE="$NNN_TMPFILE" \
         NNN_PLUG="$NNN_PLUG" \
-        nnn -dIYGaPp "$@"
+        nnn -dIYGa "$@"
 else
-    nnn -dIYGaPp "$@"
+    nnn -dIYGa "$@"
 fi
 
 # Close leftover Ghostty preview splits. n3 is often sourced from zsh

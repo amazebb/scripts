@@ -65,8 +65,13 @@ show_logs() {
 }
 
 status_gitea() {
-    if pgrep -f "gitea web" >/dev/null; then
-        echo "Gitea is running (PID: $(pgrep -f "gitea web"))"
+    local pids port
+    if pids=$(pgrep -d, -f "gitea web"); then
+        port=$(awk -F'= *' '/^HTTP_PORT/ {print $2}' ~/.gitea-data/custom/conf/app.ini)
+        echo "Gitea is running (PID: ${pids//,/ })"
+        if lsof -nP -a -iTCP:"${port:-3000}" -sTCP:LISTEN -p "$pids" >/dev/null; then
+            echo "Listening on http://localhost:${port:-3000}"
+        fi
     else
         echo "Gitea is not running"
     fi

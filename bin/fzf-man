@@ -25,9 +25,7 @@ fzf-man() {
         --bind "alt-8:+reload(_fzf-man-reload 8)+change-preview(${batman})+change-prompt(man(8) System Manager's > )" \
         --bind "alt-9:+reload(_fzf-man-reload 9)+change-preview(${batman})+change-prompt(man(9) Kernel Developer's > )" \
         --bind "alt-t:+reload(tldr -l)+change-preview(tldr {1})+change-prompt(tldr > )"
-    if [[ $ZLE_STATE == *widget* ]]; then
-        [[ -o zle ]] && zle reset-prompt
-    fi
+    zle reset-prompt 2>/dev/null
 }
 
 # Register the widget

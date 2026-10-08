@@ -74,18 +74,15 @@ EXT="${var[-e]}"
 SYM=$(realpath "${var[-s]}" 2>/dev/null)
 FILE="${var[-w]}"
 
-if ((!$#)) && $run_hash; then
-    warn "Error: source_directory required"
-elif $run_hash; then
+if $run_hash; then
+    ((!$#)) && warn "Error: source_directory required"
     SEARCH_DIR="$1"
-elif ! $run_hash; then
+else
     FILE="${var[-f]}"
 fi
 
 if $run_hash; then
-    [[ "$EXT" != "" ]] &&
-        files=$(fd -a -tf -e "$EXT" -S +1b -X du -b \; "$SEARCH_DIR") ||
-        files=$(fd -a -tf -S +1b -X du -b \; "$SEARCH_DIR")
+    files=$(fd -a -tf ${EXT:+-e "$EXT"} -S +1b -X du -b \; "$SEARCH_DIR")
 
     sz=$(awk '{sum+=$1} 
 END {

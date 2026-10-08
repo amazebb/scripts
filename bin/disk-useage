@@ -81,10 +81,7 @@ while (($#)); do
 done
 
 # Remaining positional args after --
-while (($#)); do
-    DIRS+=("$1")
-    shift
-done
+DIRS+=("$@")
 
 # Default to current directory
 [ ${#DIRS[@]} -gt 0 ] || DIRS=(".")

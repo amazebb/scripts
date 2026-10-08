@@ -160,6 +160,9 @@ _FZ_OPTS_STR=$(printf '%q ' "${OPTS[@]}")
 export _FZ_FOLDERS_STR _FZ_PRE_RG_STR _FZ_OPTS_STR
 export _FZ_GIT_TRACKED="$GIT_TRACKED"
 export _FZ_FILES="$FILES_MODE"
+_FZ_TMP=$(mktemp -d)
+export _FZ_TMP
+trap 'rm -rf "$_FZ_TMP"' EXIT
 
 rg_search() {
     local folders pre_rg opts d f paths=()
@@ -197,8 +200,8 @@ fzf --disabled --ansi --multi \
     --bind "ctrl-o:execute($OPENER)+reload($RELOAD_CMD)" \
     --bind 'alt-a:select-all,alt-d:deselect-all,ctrl-p:toggle-preview' \
     --bind 'ctrl-t:transform:[[ ! $FZF_PROMPT =~ ripgrep ]] &&
-      echo "rebind(change)+change-prompt(1. ripgrep> )+disable-search+transform-query:echo \{q} > /tmp/rg-fzf-f; cat /tmp/rg-fzf-r" ||
-      echo "unbind(change)+change-prompt(2. fzf> )+enable-search+transform-query:echo \{q} > /tmp/rg-fzf-r; cat /tmp/rg-fzf-f"' \
+      echo "rebind(change)+change-prompt(1. ripgrep> )+disable-search+transform-query:echo \{q} > $_FZ_TMP/f; cat $_FZ_TMP/r" ||
+      echo "unbind(change)+change-prompt(2. fzf> )+enable-search+transform-query:echo \{q} > $_FZ_TMP/r; cat $_FZ_TMP/f"' \
     --prompt '1. ripgrep> ' \
     --delimiter : \
     --header 'CTRL-T: Switch between ripgrep/fzf

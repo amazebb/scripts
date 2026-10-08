@@ -42,6 +42,7 @@ start_gitea() {
     else
         gitea web --config ~/.gitea-data/custom/conf/app.ini &
         until curl -s http://localhost:3000 >/dev/null; do
+            kill -0 $! 2>/dev/null || warn "Gitea exited during startup"
             sleep 1
         done
         echo "Gitea started."
@@ -53,6 +54,7 @@ stop_gitea() {
     if pgrep -f "gitea web" >/dev/null; then
         echo "Stopping Gitea..."
         pkill -INT -f "gitea web"
+        while pgrep -f "gitea web" >/dev/null; do sleep 0.5; done
         echo "Gitea stopped"
     else
         echo "Gitea not running"

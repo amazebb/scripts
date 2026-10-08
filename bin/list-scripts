@@ -88,7 +88,7 @@ while read -r script; do
     # Get the script name (basename removes the path)
     A+=("$(basename "$script")")
 
-    if [[ "$script" =~ \.awk ]]; then
+    if [[ "$script" =~ \.awk$ ]]; then
         shell="awk"
     else
         # Determine script type from shebang or vim modeline

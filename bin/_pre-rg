@@ -10,7 +10,7 @@ case "$1" in
     fi
     ;;
 *)
-    case $(file "$1") in
+    case $(file -b "$1") in
     *Zstandard*)
         exec pzstd -cdq "$1"
         ;;

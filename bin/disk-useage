@@ -40,7 +40,7 @@ EOF
 
 # Defaults
 DIRS=()
-EX="--exclude=.Trash*"
+EX=(--exclude=".Trash*")
 DEPTH="1"
 V=0
 
@@ -51,15 +51,14 @@ while (($#)); do
         exit 0
         ;;
     -d)
-        argval "$@"
-        DEPTH="$2"
+        DEPTH=$(argval "$@") || exit 1
         shift
         ;;
     -e)
         shift
-        EX=""
+        EX=()
         while (($#)) && [ "${1#-}" = "$1" ]; do
-            EX+=" --exclude=$1"
+            EX+=(--exclude="$1")
             shift
         done
         continue
@@ -101,7 +100,7 @@ temp_err=$(mktemp)
 trap 'rm -f "$temp_err"' EXIT
 
 for DIR in "${DIRS[@]}"; do
-    du ${DEPTH:+"-d $DEPTH"} ${EX:+"$EX"} "$DIR" 2>>"$temp_err"
+    du -d "$DEPTH" "${EX[@]}" "$DIR" 2>>"$temp_err"
 done |
     sort -k1 -n |
     awk -F'\t' -v w="$white" -v r="$red" -v g="$green" -v o="$orange" -v rs="$reset" \

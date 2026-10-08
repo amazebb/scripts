@@ -68,6 +68,9 @@ done
 
 FOLDERS=("$@")
 
+# archives of private folders land in /tmp; keep them owner-only
+umask 077
+
 ((!${#FOLDERS[@]})) && warn "Error: at least one folder is required"
 
 printf "Folders to backup: %s\n" "${FOLDERS[*]}"
@@ -88,7 +91,7 @@ if [[ -d "$MOUNT_POINT" ]]; then
     fi
 else
     mount_err=$(mktemp)
-    if ! echo -n "$PASSWORD" | hdiutil attach "$SPARSE_BUNDLE" -mountpoint "$MOUNT_POINT" -stdinpass -verbose 2>"$mount_err"; then
+    if ! printf '%s' "$PASSWORD" | hdiutil attach "$SPARSE_BUNDLE" -mountpoint "$MOUNT_POINT" -stdinpass -verbose 2>"$mount_err"; then
         cat "$mount_err" >&2
         rm -f "$mount_err"
         warn "Error: Failed to mount sparse bundle"
@@ -110,6 +113,7 @@ for FOLDER in "${FOLDERS[@]}"; do
 
     if ! 7z a -t7z -m0=lzma2 -mx=9 -mmt=on "$TEMP_FILE" "$FOLDER"; then
         echo "Error: Failed to compress $FOLDER, skipping"
+        rm -f "$TEMP_FILE"
         continue
     fi
 

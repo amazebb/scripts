@@ -80,7 +80,7 @@ echo ""
 matches=()
 for link in "${broken[@]}"; do
     name=$(basename "$link")
-    match=$(find "$SOURCE" -type f -name "$name" -print -quit)
+    match=$(find "$SOURCE" -type f | N=$name awk -F/ '$NF == ENVIRON["N"] {print; exit}')
 
     if [[ -n "$match" ]]; then
         match=$(realpath "$match")

@@ -11,7 +11,7 @@ I() { printf '\e[3m%s\e[0m' "$*"; }
 
 Q() {
   read -r -p "$1 [y/n]: "
-  [[ ! $REPLY =~ [Yy] ]] && echo "Aborted." && exit 1
+  [[ ! $REPLY =~ ^[Yy] ]] && echo "Aborted." && exit 1
 }
 
 ask() {

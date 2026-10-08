@@ -171,7 +171,7 @@ count=0
 start=$SECONDS
 last_update=$SECONDS
 while IFS='|' read -r src dto oto ot fmd; do
-    [[ -z "$dto" ]] && continue
+    [[ -z "$dto" || "$dto" == - ]] && continue
     ((count++))
 
     # Progress update every second
@@ -187,6 +187,7 @@ while IFS='|' read -r src dto oto ot fmd; do
     tz=""
     for offset in "$oto" "$ot"; do
         offset="${offset#"${offset%%[![:space:]]*}"}"
+        [[ "$offset" == - ]] && offset=
         if [[ -n "$offset" ]]; then
             tz="${offset//:/}"
             break
@@ -213,21 +214,23 @@ while IFS='|' read -r src dto oto ot fmd; do
     target_dir="$SYM_ROOT/$SYM/$subfolder"
     mkdir -p "$target_dir"
 
-    # Deduplicate: append _N suffix if symlink already exists
+    src_file=$(grealpath --relative-to="$target_dir" "$src")
+
+    # Deduplicate: append _N suffix if symlink already exists; skip if it already points at src
     sym_name="${base}.${ext}"
     n=1
     while [[ -e "$target_dir/$sym_name" ]]; do
+        [[ "$(readlink "$target_dir/$sym_name")" == "$src_file" ]] && continue 2
         sym_name="${base}_${n}.${ext}"
         ((n++))
     done
 
-    src_file=$(grealpath --relative-to="$target_dir" "$src")
     if ! ln -sf "$src_file" "$target_dir/$sym_name"; then
         ((failed++))
     fi
 done < <(
     find "$SRC_DIR" -type f -iname "$EXT" -newermt "$DATE" -print0 |
-        xargs -0 exiftool -fast2 \
+        xargs -0 exiftool -f -fast2 \
             -printFormat '$Directory/$FileName|$DateTimeOriginal|$OffsetTimeOriginal|$OffsetTime|$FileModifyDate'
 )
 

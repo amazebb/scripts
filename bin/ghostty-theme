@@ -125,7 +125,7 @@ show_current
 apply_theme "${themes[$idx]}"
 
 while true; do
-    IFS= read -rsn1 key || continue
+    IFS= read -rsn1 key || exit 0
 
     case "$key" in
     $'\x1b')

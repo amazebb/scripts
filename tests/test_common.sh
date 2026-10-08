@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2329,SC2016
 source "$(dirname "$0")/lib.sh"
 
 # prints "proceeded" only if Q returns control to the caller

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 # Tiny test harness: t NAME CMD... passes when CMD exits 0
 
 BIN=${BIN:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../bin" && pwd)}
@@ -16,6 +17,9 @@ need() {
   shift
   for c; do command -v "$c" >/dev/null || { skip "$n" "$c"; return 1; }; done
 }
+
+# darwin NAME: print a skip and return 1 anywhere but macOS
+darwin() { [[ $(uname) == Darwin ]] || { skip "$1" macOS; return 1; }; }
 
 t() {
   local n=$1

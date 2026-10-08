@@ -1,0 +1,43 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install tools
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update
+            sudo apt-get install -y shellcheck zsh gawk gnuplot-nox libimage-exiftool-perl
+          else
+            brew install bash coreutils shellcheck gawk gnuplot exiftool
+            {
+              echo "$(brew --prefix)/bin"
+              echo "$(brew --prefix coreutils)/libexec/gnubin"
+            } >> "$GITHUB_PATH"
+          fi
+
+      - name: Lint
+        run: |
+          zsh -n bin/fzf-man bin/_fzf-man-reload
+          shellcheck -x tests/run.sh tests/lib.sh tests/test_*.sh
+
+      # macOS-only scripts (data-backup, gitea-cli, rawsync, list-scripts) are
+      # skipped on Linux inside the tests via the darwin helper.
+      - name: Tests
+        run: tests/run.sh

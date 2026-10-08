@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2329,SC2016
 source "$(dirname "$0")/lib.sh"
 
 # dedupe's preview pass must not create symlinks before the user confirms

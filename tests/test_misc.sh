@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2329,SC2016
 source "$(dirname "$0")/lib.sh"
 
 # disk-useage -e takes several patterns and excludes each
@@ -58,7 +59,8 @@ if need ghostty-theme timeout; then
   shim ghostty 'echo Foo'
   t "ghostty-theme exits on stdin EOF" ghostty_theme_eof_exits
 fi
-if need list-scripts column; then
+# list-scripts uses BSD find -depth 1
+if darwin list-scripts && need list-scripts column; then
   t "list-scripts matches .awk only as a suffix" list_scripts_awk_suffix
 fi
 exit $FAILED

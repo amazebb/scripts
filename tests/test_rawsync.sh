@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2329,SC2016
 source "$(dirname "$0")/lib.sh"
 
 JPG=/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/yQALCAABAAEBAREA/8wABgAQEAX/2gAIAQEAAD8A0h//2Q==
@@ -27,7 +28,8 @@ rerun_is_idempotent() {
   [[ $(links "$TMP/r2") == 1 ]]
 }
 
-if need rawsync exiftool gdate grealpath base64; then
+# rawsync relies on macOS gdate/grealpath from brew coreutils
+if darwin rawsync && need rawsync exiftool gdate grealpath base64; then
   t "rawsync links files without offset tags" no_offset_still_linked
   t "rawsync rerun adds no duplicate symlinks" rerun_is_idempotent
 fi

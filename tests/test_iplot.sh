@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2329,SC2016
+# shellcheck disable=SC2329,SC2317,SC2016
 source "$(dirname "$0")/lib.sh"
 
 # stdin is data: a label of "e" ends gnuplot's inline block, and later lines run as commands

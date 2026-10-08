@@ -127,7 +127,8 @@ while (($#)); do
         shift
         ;;
     -r)
-        PRE_RG+=("$(argval "$@")") || true
+        (($# < 2)) && warn "Error: -r requires a valid argument"
+        PRE_RG+=("$2")
         shift
         ;;
     --)

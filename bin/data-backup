@@ -129,7 +129,7 @@ for FOLDER in "${FOLDERS[@]}"; do
 done
 
 if ! hdiutil detach "$MOUNT_POINT"; then
-    warn "Warning: Failed to unmount sparse bundle"
+    info "Warning: Failed to unmount sparse bundle"
 fi
 
 if ! gitea-cli start; then

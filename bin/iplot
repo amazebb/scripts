@@ -76,7 +76,7 @@ done
 
 if [ ! -t 0 ]; then
     # Stdin data mode: normalise "label: value" or "label value" to tab-separated
-    DATA=$(awk -F'[: \t]+' '{print $1 "\t" $NF}' <&0)
+    DATA=$(awk -F'[: \t]+' '{print "\"" $1 "\"\t" $NF}' <&0)
     [ -z "$DATA" ] && warn "No data received on stdin"
 
     gnuplot <<EOF

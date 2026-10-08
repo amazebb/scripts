@@ -46,11 +46,10 @@ function summary() {
 
         for (j = 1; j <= num_dupes; j++) {
             if (dupe_files[j] != target) {
-                printf("ln -sf \"%s\" \"%s\"\n", target, dupe_files[j])
+                cmd = "ln -sf -- " shq(target) " " shq(dupe_files[j])
+                print cmd
 
                 if (DRY_RUN == "d") continue
-
-                cmd = sprintf("ln -sf \"%s\" \"%s\"", target, dupe_files[j])
 
                 if (system(cmd) != 0) {
                     print\
@@ -79,6 +78,11 @@ function summary() {
         }
     }
     else print "No duplicates found"
+}
+
+function shq(str) {
+    gsub(/'/, "'\\''", str)
+    return "'" str "'"
 }
 
 function pretty_bytes(sz) {

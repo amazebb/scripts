@@ -92,23 +92,23 @@ while (($#)); do
         exit 0
         ;;
     -f)
-        fmt=$(argval "$@")
+        fmt=$(argval "$@") || exit 1
         shift 2
         ;;
     -s)
-        sep=$(argval "$@")
+        sep=$(argval "$@") || exit 1
         shift 2
         ;;
     -o)
-        logfile=$(argval "$@")
+        logfile=$(argval "$@") || exit 1
         shift 2
         ;;
     -i)
-        interval=$(argval "$@")
+        interval=$(argval "$@") || exit 1
         shift 2
         ;;
     -n)
-        count=$(argval "$@")
+        count=$(argval "$@") || exit 1
         shift 2
         ;;
     -r)
@@ -116,19 +116,19 @@ while (($#)); do
         shift
         ;;
     -g)
-        gateway=$(argval "$@")
+        gateway=$(argval "$@") || exit 1
         shift 2
         ;;
     -w)
-        wan_addr=$(argval "$@")
+        wan_addr=$(argval "$@") || exit 1
         shift 2
         ;;
     -d)
-        resolver=$(argval "$@")
+        resolver=$(argval "$@") || exit 1
         shift 2
         ;;
     -q)
-        qname=$(argval "$@")
+        qname=$(argval "$@") || exit 1
         shift 2
         ;;
     --)

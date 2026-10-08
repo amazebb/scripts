@@ -101,7 +101,7 @@ END {
     printf "File hashes written to %s\n\n" "$(U "$FILE")"
 fi
 
-found=$(awk -F'\t' -v PREF_DUPE_DIR="$SYM" -v DRY_RUN="yes" \
+found=$(awk -F'\t' -v PREF_DUPE_DIR="$SYM" -v DRY_RUN="d" \
     -f "$(dirname "$(realpath "$0")")/process-dupes.awk" "$FILE")
 
 [[ "$found" == "No duplicates found" ]] && info "$found" && exit 0

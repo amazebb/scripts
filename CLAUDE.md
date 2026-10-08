@@ -103,3 +103,11 @@ List every flag and every bare positional in OPTIONS. Wrap optional arguments in
 - Use `warn "message"` instead of `echo "error" && exit 1`
 - Use `warn` for fatal validation checks (missing commands, bad directories, etc.)
 - Use `info` for informational output that gets printed to stderr
+
+## Tests
+
+Run `tests/run.sh` after editing any script. It runs every `tests/test_*.sh`; each test is hermetic and stubs system tools with `shim`.
+
+- Check a test catches its bug: `git worktree add <dir> <pre-fix-commit>` then `BIN=<dir>/bin tests/run.sh` must fail.
+- macOS-only tests skip on Linux through the `darwin` helper in `tests/lib.sh`.
+- Lint like CI: `shellcheck -x tests/*.sh` and `shellcheck -x` on each bash script in `bin/`.

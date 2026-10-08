@@ -36,6 +36,7 @@ jobs:
         run: |
           zsh -n bin/fzf-man bin/_fzf-man-reload
           shellcheck -x tests/run.sh tests/lib.sh tests/test_*.sh
+          grep -lE '^#!.*[ /](bash|sh|dash)$' bin/* install.sh install-agents.sh | xargs shellcheck -x
 
       # macOS-only scripts (data-backup, gitea-cli, rawsync, list-scripts) are
       # skipped on Linux inside the tests via the darwin helper.

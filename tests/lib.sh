@@ -4,6 +4,7 @@
 
 BIN=${BIN:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../bin" && pwd)}
 TMP=$(cd "$(mktemp -d)" && pwd -P)
+export TMP
 trap 'rm -rf "$TMP"' EXIT
 FAILED=0
 

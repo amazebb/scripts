@@ -19,34 +19,35 @@ $(B DESCRIPTION)
     $(U dir) that mirrors the source tree. Existing outputs are skipped.
 
     Runs jobs in parallel with GNU parallel when installed, otherwise with xargs -P.
-    Input files are kept unless $(B -d) is given.
+    Input files are kept unless $(B -d) is given. Running with no arguments shows
+    this help.
 
 $(B OPTIONS)
     $(B -h)              Show this help message
 
-    $(B -t) $(U types)       Comma separated file types to convert: $(I flac), $(I .flac), $(I '*.flac'),
-                      $(I flac,wav). Use $(I '*.*') for every file $(I '(default: flac)')
+    $(B -t) $(U types)        Comma separated file types, e.g. $(I flac), $(I .flac), $(I '*.flac') or
+                    $(I flac,wav). Files ffmpeg cannot convert are reported and skipped $(I '(default: all files)')
 
-    $(B -s) $(U name)        Subfolder for the encoded files $(I '(default: convert)')
+    $(B -s) $(U name)         Subfolder for the encoded files $(I '(default: convert)')
 
     $(B --no-subfolder)  Write each output next to its source file
 
     $(B -d)              Delete each input file after it converts successfully
 
-    [$(U dir)]            Folder holding the music $(I '(default: current directory)')
+    [$(U dir)]           Folder holding the music $(I '(default: current directory)')
 
 $(B EXAMPLES)
-    Convert the flac files in the current folder into ./convert
+    Convert every audio file in the current folder into ./convert
 
-        convertaudio
+        convertaudio .
 
     Convert flac and wav files in another folder
 
         convertaudio -t flac,wav ~/Music/Album
 
-    Convert everything into a custom subfolder
+    Convert only flac files into a custom subfolder
 
-        convertaudio -t '*.*' -s aac ~/Music
+        convertaudio -t flac -s aac ~/Music
 
     Write next to the originals and delete them afterwards
 
@@ -61,10 +62,10 @@ in2m4a() {
     ffmpeg -nostdin -n -loglevel error -i "$in" \
         -map 0:a -map '0:v?' -c:v copy -disposition:v attached_pic \
         -c:a aac_at -aac_at_mode 3 -aac_at_quality 0 \
-        -map_metadata 0 "$out"
+        -map_metadata 0 "$out" 2>/dev/null
 }
 
-# convert_one FILE: skip when the output exists, delete FILE if CA_DELETE=1
+# convert_one FILE: skip existing outputs, delete FILE if CA_DELETE=1
 convert_one() {
     local f="${1#./}" out
     out="${f%.*}.$CA_EXT"
@@ -76,7 +77,7 @@ convert_one() {
         return 0
     fi
     rm -f -- "$out"
-    msg "Failed: $f" RED
+    msg "Failed to process: $f" RED
     return 1
 }
 
@@ -91,7 +92,7 @@ need_encoder() {
 noargs $#
 need_encoder aac_at
 
-TYPES=flac
+TYPES='*'
 SUB=convert
 DELETE=0
 while (($#)); do

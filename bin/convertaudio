@@ -88,6 +88,7 @@ need_encoder() {
         warn "ffmpeg has no $enc encoder (needs macOS ffmpeg)"
 }
 
+noargs $#
 need_encoder aac_at
 
 TYPES=flac

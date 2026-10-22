@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+# Convert audio files to AAC (.m4a) with ffmpeg, in parallel when available
+
+# shellcheck disable=SC2016
+source "$(dirname "$0")/common.sh"
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B convertaudio) - Convert audio files to AAC (.m4a) using ffmpeg
+
+$(B SYNOPSIS)
+    $(B "convertaudio [-h] [-t types] [-s name] [--no-subfolder] [-d]") [$(U dir)]
+
+$(B DESCRIPTION)
+    Recursively finds audio files of the given types under $(U dir) and encodes
+    them with the Apple AudioToolbox AAC encoder (aac_at, macOS ffmpeg only),
+    keeping metadata and embedded cover art. Output goes to a subfolder of
+    $(U dir) that mirrors the source tree. Existing outputs are skipped.
+
+    Runs jobs in parallel with GNU parallel when installed, otherwise with xargs -P.
+    Input files are kept unless $(B -d) is given.
+
+$(B OPTIONS)
+    $(B -h)              Show this help message
+
+    $(B -t) $(U types)       Comma separated file types to convert: $(I flac), $(I .flac), $(I '*.flac'),
+                      $(I flac,wav). Use $(I '*.*') for every file $(I '(default: flac)')
+
+    $(B -s) $(U name)        Subfolder for the encoded files $(I '(default: convert)')
+
+    $(B --no-subfolder)  Write each output next to its source file
+
+    $(B -d)              Delete each input file after it converts successfully
+
+    [$(U dir)]            Folder holding the music $(I '(default: current directory)')
+
+$(B EXAMPLES)
+    Convert the flac files in the current folder into ./convert
+
+        convertaudio
+
+    Convert flac and wav files in another folder
+
+        convertaudio -t flac,wav ~/Music/Album
+
+    Convert everything into a custom subfolder
+
+        convertaudio -t '*.*' -s aac ~/Music
+
+    Write next to the originals and delete them afterwards
+
+        convertaudio --no-subfolder -d ~/Music
+
+EOF
+}
+
+# in2m4a IN OUT: encode IN to AAC in OUT, keeping tags and cover art
+in2m4a() {
+    local in=$1 out=$2
+    ffmpeg -nostdin -n -loglevel error -i "$in" \
+        -map 0:a -map '0:v?' -c:v copy -disposition:v attached_pic \
+        -c:a aac_at -aac_at_mode 3 -aac_at_quality 0 \
+        -map_metadata 0 "$out"
+}
+
+# convert_one FILE: skip when the output exists, delete FILE if CA_DELETE=1
+convert_one() {
+    local f="${1#./}" out
+    out="${f%.*}.$CA_EXT"
+    [[ -n $CA_SUB ]] && out="$CA_SUB/$out"
+    [[ $out -ef $f || -e $out ]] && return 0
+    mkdir -p "$(dirname "$out")"
+    if "$CA_ENCODER" "$f" "$out"; then
+        [[ $CA_DELETE == 1 ]] && rm -- "$f"
+        return 0
+    fi
+    rm -f -- "$out"
+    msg "Failed: $f" RED
+    return 1
+}
+
+# need_encoder NAME: exit unless ffmpeg is installed and has the encoder
+need_encoder() {
+    local enc=$1
+    command -v ffmpeg &>/dev/null || warn "ffmpeg not found. Install with: $(I brew install ffmpeg)"
+    ffmpeg -hide_banner -encoders 2>/dev/null | grep -qw "$enc" ||
+        warn "ffmpeg has no $enc encoder (needs macOS ffmpeg)"
+}
+
+need_encoder aac_at
+
+TYPES=flac
+SUB=convert
+DELETE=0
+while (($#)); do
+    case "$1" in
+    -h) usage && exit 0 ;;
+    -t) TYPES=$(argval "$@") && shift ;;
+    -s) SUB=$(argval "$@") && shift ;;
+    --no-subfolder) SUB= ;;
+    -d) DELETE=1 ;;
+    --)
+        shift
+        break
+        ;;
+    -*) warn "Unknown option: $1" ;;
+    *) break ;;
+    esac
+    shift
+done
+
+DIR="${1:-.}"
+[[ ! -d "$DIR" ]] && warn "Error: '$DIR' is not a directory"
+
+# Build the find name filter from the type list
+names=()
+IFS=', ' read -ra list <<<"$TYPES"
+for ext in "${list[@]}"; do
+    ext="${ext#\*}"
+    ext="${ext#.}"
+    if [[ -z $ext || $ext == '*' ]]; then
+        names=()
+        break
+    fi
+    ((${#names[@]})) && names+=(-o)
+    names+=(-iname "*.$ext")
+done
+((${#names[@]})) && names=('(' "${names[@]}" ')')
+
+export CA_SUB="${SUB%/}" CA_DELETE="$DELETE" CA_EXT=m4a CA_ENCODER=in2m4a
+export -f in2m4a convert_one msg color
+
+cd "$DIR" || exit 1
+prune=()
+[[ -n $CA_SUB ]] && prune=(-not -path "./$CA_SUB/*")
+
+files() { find . -type f "${prune[@]}" "${names[@]}" -print0; }
+
+if command -v parallel &>/dev/null; then
+    files | SHELL=$BASH parallel -0 --eta convert_one {}
+else
+    jobs=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
+    files | xargs -0 -n1 -P "$jobs" bash -c 'convert_one "$1"' _
+fi

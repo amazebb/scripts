@@ -112,6 +112,7 @@ while (($#)); do
     shift
 done
 
+(($# > 1)) && warn "Unexpected argument: $2 (options go before dir)"
 DIR="${1:-.}"
 [[ ! -d "$DIR" ]] && warn "Error: '$DIR' is not a directory"
 

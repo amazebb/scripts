@@ -3,6 +3,7 @@
 ## Table of Contents
 
 - [build-nvim-nightly](#build-nvim-nightly)
+- [convertaudio](#convertaudio)
 - [data-backup](#data-backup)
 - [dedupe](#dedupe)
 - [disk-useage](#disk-useage)
@@ -48,6 +49,57 @@
     Build from a custom repo location
 
         build-nvim-nightly -r ~/src/neovim -d ~/.local/nvim-nightly
+</pre>
+
+## [convertaudio](https://github.com/amazebb/scripts/blob/master/bin/convertaudio)
+
+<pre>
+<b>NAME</b>
+    <b>convertaudio</b> - Convert audio files to AAC (.m4a) using ffmpeg
+
+<b>SYNOPSIS</b>
+    <b>convertaudio [-h] [-t types] [-s name] [--no-subfolder] [-d]</b> [<u>dir</u>]
+
+<b>DESCRIPTION</b>
+    Recursively finds audio files of the given types under <u>dir</u> and encodes
+    them with the Apple AudioToolbox AAC encoder (aac_at, macOS ffmpeg only),
+    keeping metadata and embedded cover art. Output goes to a subfolder of
+    <u>dir</u> that mirrors the source tree. Existing outputs are skipped.
+
+    Runs jobs in parallel with GNU parallel when installed, otherwise with xargs -P.
+    Input files are kept unless <b>-d</b> is given. Running with no arguments shows
+    this help.
+
+<b>OPTIONS</b>
+    <b>-h</b>              Show this help message
+
+    <b>-t</b> <u>types</u>        Comma separated file types, e.g. <i>flac</i>, <i>.flac</i>, <i>*.flac</i> or
+                    <i>flac,wav</i>. Files ffmpeg cannot convert are reported and skipped <i>(default: all files)</i>
+
+    <b>-s</b> <u>name</u>         Subfolder for the encoded files <i>(default: convert)</i>
+
+    <b>--no-subfolder</b>  Write each output next to its source file
+
+    <b>-d</b>              Delete each input file after it converts successfully
+
+    [<u>dir</u>]           Folder holding the music <i>(default: current directory)</i>
+
+<b>EXAMPLES</b>
+    Convert every audio file in the current folder into ./convert
+
+        convertaudio .
+
+    Convert flac and wav files in another folder
+
+        convertaudio -t flac,wav ~/Music/Album
+
+    Convert only flac files into a custom subfolder
+
+        convertaudio -t flac -s aac ~/Music
+
+    Write next to the originals and delete them afterwards
+
+        convertaudio --no-subfolder -d ~/Music
 </pre>
 
 ## [data-backup](https://github.com/amazebb/scripts/blob/master/bin/data-backup)

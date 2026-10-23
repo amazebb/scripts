@@ -74,6 +74,9 @@ while (($#)); do
     shift
 done
 
+# gnuplot needs the quotes, which a heredoc would strip from ${TITLE:+...}
+[ -n "$TITLE" ] && TITLE="set title \"$TITLE\""
+
 if [ ! -t 0 ]; then
     # Stdin data mode: normalise "label: value" or "label value" to tab-separated
     DATA=$(awk -F'[: \t]+' '{print "\"" $1 "\"\t" $NF}' <&0)
@@ -85,7 +88,7 @@ set output '|kitten icat --stdin yes'
 set object 1 rectangle from screen 0,0 to screen 1,1 fillcolor rgb"#fdf6e3" behind
 set style fill solid
 set xtics rotate by -45
-${TITLE:+set title "$TITLE"}
+$TITLE
 plot '-' using 2:xtic(1) with $STYLE notitle
 $DATA
 e
@@ -101,7 +104,7 @@ set autoscale
 set samples 1000
 set output '|kitten icat --stdin yes'
 set object 1 rectangle from screen 0,0 to screen 1,1 fillcolor rgb"#fdf6e3" behind
-${TITLE:+set title "$TITLE"}
+$TITLE
 plot ${plot_expr}
 set output '/dev/null'
 EOF

@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# Histogram of audio packet sizes to show how variable the bitrate is
+
+# shellcheck disable=SC2016
+source "$(dirname "$0")/common.sh"
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B vbrhist) - Histogram of audio packet sizes to show VBR behaviour
+
+$(B SYNOPSIS)
+    $(B "vbrhist [-h] [-t] [-w bytes]") $(U file)
+
+$(B DESCRIPTION)
+    Reads the packet sizes of the first audio stream in $(U file) with ffprobe and
+    buckets them. A wide spread means variable bitrate; one tall bar means
+    constant bitrate. The first packet is skipped as it only primes the encoder.
+
+    Draws a chart with $(B iplot) in Kitty or Ghostty, otherwise prints bars.
+
+$(B OPTIONS)
+    $(B -h)           Show this help message
+
+    $(B -t)           Print text bars even in a graphics terminal
+
+    $(B -w) $(U bytes)    Bucket width in bytes $(I '(default: 100)')
+
+    $(U file)         Audio file to inspect
+
+$(B EXAMPLES)
+    Check a converted file
+
+        vbrhist convert/Album/01.m4a
+
+    Finer buckets as text
+
+        vbrhist -t -w 50 song.m4a
+
+EOF
+}
+
+noargs $#
+
+TEXT=false
+WIDTH=100
+while (($#)); do
+    case "$1" in
+    -h) usage && exit 0 ;;
+    -t) TEXT=true ;;
+    -w) WIDTH=$(argval "$@") && shift ;;
+    --)
+        shift
+        break
+        ;;
+    -*) warn "Unknown option: $1" ;;
+    *) break ;;
+    esac
+    shift
+done
+
+FILE="${1:-}"
+[[ -z $FILE ]] && warn "Error: file is required"
+[[ ! -f $FILE ]] && warn "Error: '$FILE' is not a file"
+[[ $WIDTH =~ ^[1-9][0-9]*$ ]] || warn "Error: -w needs a positive number"
+command -v ffprobe &>/dev/null || warn "ffprobe not found. Install with: $(I brew install ffmpeg)"
+
+# Bucket sizes into "start count" lines, empty buckets included
+buckets=$(ffprobe -v error -select_streams a:0 -show_entries packet=size -of csv=p=0 "$FILE" |
+    tr -d ',' | tail -n +2 |
+    awk -v w="$WIDTH" '
+        { b = int($1 / w) * w; c[b]++; n++; s += $1
+          if (min == "" || $1 < min) min = $1
+          if ($1 > max) max = $1 }
+        END {
+            if (!n) exit 1
+            printf "%d packets, min %d, avg %d, max %d bytes\n", n, min, s / n, max > "/dev/stderr"
+            for (b = int(min / w) * w; b <= max; b += w) print b, c[b] + 0
+        }') || warn "No audio packets found in '$FILE'"
+
+graphics=false
+case "${TERM:-}:${TERM_PROGRAM:-}" in
+xterm-kitty:* | xterm-ghostty:* | *:ghostty) graphics=true ;;
+esac
+if ! $TEXT && $graphics && command -v gnuplot &>/dev/null && command -v kitten &>/dev/null; then
+    "$(dirname "$0")/iplot" -t "$(basename "$FILE") packet sizes (bytes)" <<<"$buckets"
+else
+    awk '{ c[NR] = $2; l[NR] = $1; if ($2 > m) m = $2 }
+        END { for (i = 1; i <= NR; i++) printf "%6d %7d %s\n", l[i], c[i], substr("##################################################", 1, c[i] * 50 / m + (c[i] > 0)) }' <<<"$buckets"
+fi

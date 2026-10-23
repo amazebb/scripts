@@ -20,6 +20,7 @@
 - [rawsync](#rawsync)
 - [shtoc](#shtoc)
 - [shtomd](#shtomd)
+- [vbrhist](#vbrhist)
 
 ## [build-nvim-nightly](https://github.com/amazebb/scripts/blob/master/bin/build-nvim-nightly)
 
@@ -764,5 +765,40 @@
     Write the usage to a file
 
         shtomd bin/exifmv &gt; exifmv.md
+</pre>
+
+## [vbrhist](https://github.com/amazebb/scripts/blob/master/bin/vbrhist)
+
+<pre>
+<b>NAME</b>
+    <b>vbrhist</b> - Histogram of audio packet sizes to show VBR behaviour
+
+<b>SYNOPSIS</b>
+    <b>vbrhist [-h] [-t] [-w bytes]</b> <u>file</u>
+
+<b>DESCRIPTION</b>
+    Reads the packet sizes of the first audio stream in <u>file</u> with ffprobe and
+    buckets them. A wide spread means variable bitrate; one tall bar means
+    constant bitrate. The first packet is skipped as it only primes the encoder.
+
+    Draws a chart with <b>iplot</b> in Kitty or Ghostty, otherwise prints bars.
+
+<b>OPTIONS</b>
+    <b>-h</b>           Show this help message
+
+    <b>-t</b>           Print text bars even in a graphics terminal
+
+    <b>-w</b> <u>bytes</u>    Bucket width in bytes <i>(default: 100)</i>
+
+    <u>file</u>         Audio file to inspect
+
+<b>EXAMPLES</b>
+    Check a converted file
+
+        vbrhist convert/Album/01.m4a
+
+    Finer buckets as text
+
+        vbrhist -t -w 50 song.m4a
 </pre>
 

@@ -10,8 +10,8 @@ $(B NAME)
     $(B iplot) - Plot functions in the Kitty terminal using gnuplot
 
 $(B SYNOPSIS)
-    $(B "iplot [-h] [-s style] [-t title]") $(U expression) ...
-    command | $(B "iplot [-s style] [-t title]")
+    $(B "iplot [-h] [-s style] [-t title] [-x label] [-y label]") $(U expression) ...
+    command | $(B "iplot [-s style] [-t title] [-x label] [-y label]")
 
 $(B DESCRIPTION)
     Renders gnuplot expressions inline in the Kitty terminal using
@@ -26,6 +26,10 @@ $(B OPTIONS)
     $(B -s) $(U style)  Plot style for data mode $(I '(default: boxes)')
 
     $(B -t) $(U title)  Chart title
+
+    $(B -x) $(U label)  Label for the x-axis
+
+    $(B -y) $(U label)  Label for the y-axis
 
 $(B EXAMPLES)
     Plot a sine wave
@@ -49,6 +53,8 @@ EOF
 
 STYLE="boxes"
 TITLE=""
+XLABEL=""
+YLABEL=""
 
 while (($#)); do
     case $1 in
@@ -64,6 +70,14 @@ while (($#)); do
         TITLE=$(argval "$@")
         shift
         ;;
+    -x)
+        XLABEL=$(argval "$@")
+        shift
+        ;;
+    -y)
+        YLABEL=$(argval "$@")
+        shift
+        ;;
     --)
         shift
         break
@@ -76,6 +90,8 @@ done
 
 # gnuplot needs the quotes, which a heredoc would strip from ${TITLE:+...}
 [ -n "$TITLE" ] && TITLE="set title \"$TITLE\""
+[ -n "$XLABEL" ] && XLABEL="set xlabel \"$XLABEL\""
+[ -n "$YLABEL" ] && YLABEL="set ylabel \"$YLABEL\""
 
 if [ ! -t 0 ]; then
     # Stdin data mode: normalise "label: value" or "label value" to tab-separated
@@ -89,6 +105,8 @@ set object 1 rectangle from screen 0,0 to screen 1,1 fillcolor rgb"#fdf6e3" behi
 set style fill solid
 set xtics rotate by -45
 $TITLE
+$XLABEL
+$YLABEL
 plot '-' using 2:xtic(1) with $STYLE notitle
 $DATA
 e
@@ -105,6 +123,8 @@ set samples 1000
 set output '|kitten icat --stdin yes'
 set object 1 rectangle from screen 0,0 to screen 1,1 fillcolor rgb"#fdf6e3" behind
 $TITLE
+$XLABEL
+$YLABEL
 plot ${plot_expr}
 set output '/dev/null'
 EOF

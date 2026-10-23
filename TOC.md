@@ -459,8 +459,8 @@
     <b>iplot</b> - Plot functions in the Kitty terminal using gnuplot
 
 <b>SYNOPSIS</b>
-    <b>iplot [-h] [-s style] [-t title]</b> <u>expression</u> ...
-    command | <b>iplot [-s style] [-t title]</b>
+    <b>iplot [-h] [-s style] [-t title] [-x label] [-y label]</b> <u>expression</u> ...
+    command | <b>iplot [-s style] [-t title] [-x label] [-y label]</b>
 
 <b>DESCRIPTION</b>
     Renders gnuplot expressions inline in the Kitty terminal using
@@ -475,6 +475,10 @@
     <b>-s</b> <u>style</u>  Plot style for data mode <i>(default: boxes)</i>
 
     <b>-t</b> <u>title</u>  Chart title
+
+    <b>-x</b> <u>label</u>  Label for the x-axis
+
+    <b>-y</b> <u>label</u>  Label for the y-axis
 
 <b>EXAMPLES</b>
     Plot a sine wave
@@ -771,15 +775,16 @@
 
 <pre>
 <b>NAME</b>
-    <b>vbrhist</b> - Histogram of audio packet sizes to show VBR behaviour
+    <b>vbrhist</b> - Histogram of audio packet bitrates to show VBR behaviour
 
 <b>SYNOPSIS</b>
-    <b>vbrhist [-h] [-t] [-w bytes]</b> <u>file</u>
+    <b>vbrhist [-h] [-t] [-u unit] [-y axis] [-b bins]</b> <u>file</u>
 
 <b>DESCRIPTION</b>
-    Reads the packet sizes of the first audio stream in <u>file</u> with ffprobe and
-    buckets them. A wide spread means variable bitrate; one tall bar means
-    constant bitrate. The first packet is skipped as it only primes the encoder.
+    Reads the packets of the first audio stream in <u>file</u> with ffprobe and
+    buckets them by bitrate or by size. A wide spread means variable bitrate;
+    one tall bar means constant bitrate. The first packet is skipped as it only
+    primes the encoder.
 
     Draws a chart with <b>iplot</b> in Kitty or Ghostty, otherwise prints bars.
 
@@ -788,7 +793,13 @@
 
     <b>-t</b>           Print text bars even in a graphics terminal
 
-    <b>-w</b> <u>bytes</u>    Bucket width in bytes <i>(default: 100)</i>
+    <b>-u</b> <u>unit</u>      <i>kbps</i> buckets packets by their bitrate, <i>bytes</i> by their size
+                 <i>(default: kbps)</i>
+
+    <b>-y</b> <u>axis</u>      <i>norm</i> shows each bucket as a percentage of all packets, <i>count</i> shows
+                 packet counts <i>(default: norm)</i>
+
+    <b>-b</b> <u>bins</u>      Number of buckets spanning the min to max value <i>(default: 20)</i>
 
     <u>file</u>         Audio file to inspect
 
@@ -797,8 +808,16 @@
 
         vbrhist convert/Album/01.m4a
 
-    Finer buckets as text
+    Packet sizes in bytes instead of bitrate
 
-        vbrhist -t -w 50 song.m4a
+        vbrhist -u bytes song.m4a
+
+    Raw packet counts on the y-axis
+
+        vbrhist -y count song.m4a
+
+    More buckets as text
+
+        vbrhist -t -b 40 song.m4a
 </pre>
 

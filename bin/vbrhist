@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Histogram of audio packet sizes to show how variable the bitrate is
+# Histogram of audio packet bitrates to show how variable the bitrate is
 
 # shellcheck disable=SC2016
 source "$(dirname "$0")/common.sh"
@@ -7,15 +7,16 @@ source "$(dirname "$0")/common.sh"
 usage() {
     cat <<EOF
 $(B NAME)
-    $(B vbrhist) - Histogram of audio packet sizes to show VBR behaviour
+    $(B vbrhist) - Histogram of audio packet bitrates to show VBR behaviour
 
 $(B SYNOPSIS)
-    $(B "vbrhist [-h] [-t] [-w bytes]") $(U file)
+    $(B "vbrhist [-h] [-t] [-u unit] [-y axis] [-b bins]") $(U file)
 
 $(B DESCRIPTION)
-    Reads the packet sizes of the first audio stream in $(U file) with ffprobe and
-    buckets them. A wide spread means variable bitrate; one tall bar means
-    constant bitrate. The first packet is skipped as it only primes the encoder.
+    Reads the packets of the first audio stream in $(U file) with ffprobe and
+    buckets them by bitrate or by size. A wide spread means variable bitrate;
+    one tall bar means constant bitrate. The first packet is skipped as it only
+    primes the encoder.
 
     Draws a chart with $(B iplot) in Kitty or Ghostty, otherwise prints bars.
 
@@ -24,7 +25,13 @@ $(B OPTIONS)
 
     $(B -t)           Print text bars even in a graphics terminal
 
-    $(B -w) $(U bytes)    Bucket width in bytes $(I '(default: 100)')
+    $(B -u) $(U unit)      $(I kbps) buckets packets by their bitrate, $(I bytes) by their size
+                 $(I '(default: kbps)')
+
+    $(B -y) $(U axis)      $(I norm) shows each bucket as a percentage of all packets, $(I count) shows
+                 packet counts $(I '(default: norm)')
+
+    $(B -b) $(U bins)      Number of buckets spanning the min to max value $(I '(default: 20)')
 
     $(U file)         Audio file to inspect
 
@@ -33,9 +40,17 @@ $(B EXAMPLES)
 
         vbrhist convert/Album/01.m4a
 
-    Finer buckets as text
+    Packet sizes in bytes instead of bitrate
 
-        vbrhist -t -w 50 song.m4a
+        vbrhist -u bytes song.m4a
+
+    Raw packet counts on the y-axis
+
+        vbrhist -y count song.m4a
+
+    More buckets as text
+
+        vbrhist -t -b 40 song.m4a
 
 EOF
 }
@@ -43,12 +58,16 @@ EOF
 noargs $#
 
 TEXT=false
-WIDTH=100
+UNIT=kbps
+AXIS=norm
+BINS=20
 while (($#)); do
     case "$1" in
     -h) usage && exit 0 ;;
     -t) TEXT=true ;;
-    -w) WIDTH=$(argval "$@") && shift ;;
+    -u) UNIT=$(argval "$@") && shift ;;
+    -y) AXIS=$(argval "$@") && shift ;;
+    -b) BINS=$(argval "$@") && shift ;;
     --)
         shift
         break
@@ -62,29 +81,44 @@ done
 FILE="${1:-}"
 [[ -z $FILE ]] && warn "Error: file is required"
 [[ ! -f $FILE ]] && warn "Error: '$FILE' is not a file"
-[[ $WIDTH =~ ^[1-9][0-9]*$ ]] || warn "Error: -w needs a positive number"
+[[ $UNIT == kbps || $UNIT == bytes ]] || warn "Error: -u must be kbps or bytes"
+[[ $AXIS == norm || $AXIS == count ]] || warn "Error: -y must be norm or count"
+[[ $BINS =~ ^[1-9][0-9]*$ ]] || warn "Error: -b needs a positive number"
 command -v ffprobe &>/dev/null || warn "ffprobe not found. Install with: $(I brew install ffmpeg)"
 
-# Bucket sizes into "start count" lines, empty buckets included
-buckets=$(ffprobe -v error -select_streams a:0 -show_entries packet=size -of csv=p=0 "$FILE" |
-    tr -d ',' | tail -n +2 |
-    awk -v w="$WIDTH" '
-        { b = int($1 / w) * w; c[b]++; n++; s += $1
-          if (min == "" || $1 < min) min = $1
-          if ($1 > max) max = $1 }
+# Bucket packets into "start count" lines, BINS buckets from min to max
+buckets=$(ffprobe -v error -select_streams a:0 -show_entries packet=duration_time,size -of csv=p=0 "$FILE" |
+    tail -n +2 |
+    awk -F, -v bins="$BINS" -v unit="$UNIT" -v axis="$AXIS" '
+        { v[NR] = unit == "kbps" ? $2 * 8 / $1 / 1000 : $2
+          s += v[NR]
+          if (NR == 1 || v[NR] < min) min = v[NR]
+          if (v[NR] > max) max = v[NR] }
         END {
+            n = NR
             if (!n) exit 1
-            printf "%d packets, min %d, avg %d, max %d bytes\n", n, min, s / n, max > "/dev/stderr"
-            for (b = int(min / w) * w; b <= max; b += w) print b, c[b] + 0
+            printf "%d packets, min %d, avg %d, max %d %s\n", n, min, s / n, max, unit > "/dev/stderr"
+            w = (max - min) / bins
+            if (w == 0) w = 1
+            for (i = 1; i <= n; i++) {
+                k = int((v[i] - min) / w)
+                c[k >= bins ? bins - 1 : k]++
+            }
+            for (k = 0; k < bins; k++)
+                print sprintf("%.0f", min + k * w), axis == "norm" ? sprintf("%.1f", c[k] * 100 / n) : c[k] + 0
         }') || warn "No audio packets found in '$FILE'"
+
+if [[ $UNIT == kbps ]]; then xlabel="Bitrate (kbps)"; else xlabel="Packet size (bytes)"; fi
+if [[ $AXIS == norm ]]; then ylabel="% of packets"; else ylabel="Count"; fi
 
 graphics=false
 case "${TERM:-}:${TERM_PROGRAM:-}" in
 xterm-kitty:* | xterm-ghostty:* | *:ghostty) graphics=true ;;
 esac
 if ! $TEXT && $graphics && command -v gnuplot &>/dev/null && command -v kitten &>/dev/null; then
-    "$(dirname "$0")/iplot" -t "$(basename "$FILE") packet sizes (bytes)" <<<"$buckets"
+    "$(dirname "$0")/iplot" -t "$(basename "$FILE")" -x "$xlabel" -y "$ylabel" <<<"$buckets"
 else
-    awk '{ c[NR] = $2; l[NR] = $1; if ($2 > m) m = $2 }
-        END { for (i = 1; i <= NR; i++) printf "%6d %7d %s\n", l[i], c[i], substr("##################################################", 1, c[i] * 50 / m + (c[i] > 0)) }' <<<"$buckets"
+    awk -v xh="$UNIT" -v yh="$([[ $AXIS == norm ]] && echo % || echo count)" 'BEGIN { printf "%6s %7s\n", xh, yh }
+        { c[NR] = $2; l[NR] = $1; if ($2 > m) m = $2 }
+        END { for (i = 1; i <= NR; i++) printf "%6d %7s %s\n", l[i], c[i], substr("##################################################", 1, c[i] * 50 / m + (c[i] > 0)) }' <<<"$buckets"
 fi

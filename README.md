@@ -23,6 +23,28 @@ Make sure `~/.local/bin` is in your `$PATH`. Add this to your `~/.bashrc` or `~/
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
+## Weather
+
+Four scripts for US weather in the terminal, all taking a zip code, `lat,lon` or (by default) your
+IP location. See the [TOC](TOC.md) for every option.
+
+| Script | Shows |
+|---|---|
+| `wxforecast` | hourly forecast chart (temperature and expected rainfall by default, any two of eleven metrics), `-d` for the daily forecast, `-r` for raw rows |
+| `wxradar` | animated radar loop over a map, `-r` for the radius, drawn in the terminal in kitty or ghostty, with the forecast chart above it |
+| `wxnow` | what the nearest station is measuring now, including pressure |
+| `wxalerts` | active watches, warnings and advisories, most severe first |
+
+Active alerts are also printed above the `wxforecast` and `wxradar` output.
+
+Data comes from the National Weather Service API (forecasts, observations, alerts), RainViewer (radar),
+OpenStreetMap (map tiles), zippopotam.us (zip codes) and ipinfo.io (IP location). None need a key.
+
+Needs `curl` and `awk`. `wxradar` also needs `ffmpeg`, plus `chafa`, `kitten` or `mpv` to display the
+loop. `wxradar` and `wxnow` use `mapfile`, so on macOS install a newer bash (`brew install bash`) and
+put it first in your `$PATH`. The helper files are in `bin/wx/`, so re-run `./install.sh` after pulling to
+link that folder.
+
 ## Scheduled jobs
 
 Some scripts are meant to run on a schedule. macOS uses `launchd` for this, and

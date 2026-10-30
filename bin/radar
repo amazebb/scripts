@@ -136,11 +136,17 @@ stitch() {
         -vf "tile=${2}x$3" -frames:v 1 "$4"
 }
 
-# rainviewer LAT LON MILES LATEST OUT: write a radar loop gif centred on LAT LON, one frame if LATEST is 1
+# stamp_fmt [EPOCH]: DD-MMM-YYYY HH:MM local time, now by default
+stamp_fmt() {
+    local f='+%d-%b-%Y %H:%M'
+    if [[ -z $1 ]]; then date "$f"; else date -d "@$1" "$f" 2>/dev/null || date -r "$1" "$f"; fi
+}
+
+# rainviewer LAT LON MILES LATEST OUT LABEL: write a radar loop gif centred on LAT LON, one frame if LATEST is 1
 rainviewer() {
-    local lat=$1 lon=$2 mi=$3 latest=$4 out=$5 d z x0 y0 cols rows cx cy size host
-    local m mx0 my0 mcols mrows mcx mcy msize
-    local -a paths curl_args
+    local lat=$1 lon=$2 mi=$3 latest=$4 out=$5 label=$6 d z x0 y0 cols rows cx cy size host
+    local stamp labels="" t m mx0 my0 mcols mrows mcx mcy msize
+    local -a paths times curl_args
     local i j f k
     command -v ffmpeg &>/dev/null || warn "ffmpeg not found. Install with: $(I brew install ffmpeg)"
     d=$(dirname "$out")
@@ -151,7 +157,12 @@ rainviewer() {
     host=$(sed -n 's/.*"host": *"\([^"]*\)".*/\1/p' <<<"$json")
     mapfile -t paths < <(grep -o '"path": *"/v2/radar/[a-z0-9]*"' <<<"$json" | sed 's/.*"\(\/v2[^"]*\)"/\1/')
     ((${#paths[@]})) || warn "RainViewer returned no radar frames"
-    ((latest)) && paths=("${paths[-1]}")
+    mapfile -t times < <(grep -oE '"time": *[0-9]+, *"path": *"/v2/radar/[a-z0-9]+"' <<<"$json" | grep -oE '^"time": *[0-9]+' | grep -oE '[0-9]+')
+    if ((latest)); then
+        paths=("${paths[-1]}")
+        times=("${times[-1]}")
+    fi
+    stamp=${times[-1]}
 
     for ((j = 0; j < rows; j++)); do
         for ((i = 0; i < cols; i++)); do
@@ -166,15 +177,21 @@ rainviewer() {
             curl_args+=(-o "$d/b_$((j * mcols + i)).png" "https://tile.openstreetmap.org/$m/$((mx0 + i))/$((my0 + j)).png")
         done
     done
-    info "Fetching ${#paths[@]} radar frames"
+    info "$label ($lat,$lon), $mi mi, RainViewer, ${#paths[@]} frame(s) to $(stamp_fmt "$stamp")"
     curl -fsSL -A "radar (github.com/amazebb/scripts)" --parallel --parallel-max 8 "${curl_args[@]}" || warn "Tile download failed"
 
     stitch "$d/b" "$mcols" "$mrows" "$d/base.png"
     for f in "${!paths[@]}"; do
         stitch "$d/r${f}" "$cols" "$rows" "$d/R_$(printf %02d "$f").png"
     done
+    if ffmpeg -hide_banner -filters 2>/dev/null | grep -q drawtext; then
+        for f in "${!times[@]}"; do
+            t=$(stamp_fmt "${times[f]}")
+            labels+="drawtext=font=monospace:text='${t//:/\\:}':x=8:y=8:fontsize=22:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6:enable='eq(n,$f)',"
+        done
+    fi
     ffmpeg -nostdin -loglevel error -y -loop 1 -framerate 4 -i "$d/base.png" -framerate 4 -i "$d/R_%02d.png" \
-        -filter_complex "[0]crop=$msize:$msize:$mcx:$mcy,scale=720:720:flags=lanczos[bg];[1]crop=$size:$size:$cx:$cy,scale=720:720:flags=lanczos[fg];[bg][fg]overlay=shortest=1,drawbox=x=iw/2-14:y=ih/2-4:w=28:h=8:color=black:t=fill,drawbox=x=iw/2-4:y=ih/2-14:w=8:h=28:color=black:t=fill,drawbox=x=iw/2-12:y=ih/2-2:w=24:h=4:color=white:t=fill,drawbox=x=iw/2-2:y=ih/2-12:w=4:h=24:color=white:t=fill,split[a][b];[a]palettegen[p];[b][p]paletteuse" \
+        -filter_complex "[0]crop=$msize:$msize:$mcx:$mcy,scale=720:720:flags=lanczos[bg];[1]crop=$size:$size:$cx:$cy,scale=720:720:flags=lanczos[fg];[bg][fg]overlay=shortest=1,${labels}drawbox=x=iw/2-14:y=ih/2-4:w=28:h=8:color=black:t=fill,drawbox=x=iw/2-4:y=ih/2-14:w=8:h=28:color=black:t=fill,drawbox=x=iw/2-12:y=ih/2-2:w=24:h=4:color=white:t=fill,drawbox=x=iw/2-2:y=ih/2-12:w=4:h=24:color=white:t=fill,split[a][b];[a]palettegen[p];[b][p]paletteuse" \
         -f gif "$out"
 }
 
@@ -211,13 +228,13 @@ main() {
             name=$(station_for $ll)
         else
             # shellcheck disable=SC2086
-            rainviewer $ll "$mi" "$latest" "$gif"
+            rainviewer $ll "$mi" "$latest" "$gif" "${loc:-IP location}"
         fi
     else
         name=$(tr "[:lower:]" "[:upper:]" <<<"$loc")
     fi
     if [[ -n $name ]]; then
-        info "Fetching ${name} radar"
+        info "${loc:-IP location} -> ${name}, NWS, $(stamp_fmt)"
         curl -fsSL -o "$gif" "$BASE/${name}_$( ((latest)) && echo 0 || echo loop).gif" || warn "No radar loop named $name"
     fi
 

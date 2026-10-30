@@ -13,7 +13,7 @@ $(B NAME)
     $(B wxradar) - Show an animated weather radar loop around a US location
 
 $(B SYNOPSIS)
-    $(B "wxradar [-h] [-m] [-n] [-l] [-s] [-f] [-r miles] [-F fps]") [$(U location)]
+    $(B "wxradar [-h] [-m] [-n] [-l] [-s] [-f [metric [metric2]]] [-r miles] [-F fps]") [$(U location)]
 
 $(B DESCRIPTION)
     Builds a radar loop centred on $(U location) from RainViewer radar tiles over a
@@ -38,8 +38,9 @@ $(B OPTIONS)
     $(B -s)           Scale the image up to fill the terminal height, less the height of
                   the $(B -f) forecast $(I '(fullscreen with mpv)')
 
-    $(B -f)           Show the $(B wxforecast) chart above the radar. Needs a zip or
-                  latitude,longitude
+    $(B -f) [$(U metric) [$(U metric2)]]
+                  Show the $(B wxforecast) chart above the radar, with the given y axis
+                  metrics $(I '(default: temp qpf)'). Needs a zip or latitude,longitude
 
     $(B -r) $(U miles)    Radius to show, about 10 to 400 $(I '(default: 50)')
 
@@ -67,6 +68,10 @@ $(B EXAMPLES)
     The forecast chart above a radar filling the rest of the terminal
 
         wxradar -f -s 60601
+
+    The forecast chart with humidity and wind gusts
+
+        wxradar -f hum gust 60601
 
     The latest image only
 
@@ -180,7 +185,7 @@ rainviewer() {
 }
 
 main() {
-    local mpv=0 nws=0 latest=0 size=0 fcast=0 loc='' mi=50 fps=1
+    local mpv=0 nws=0 latest=0 size=0 fcast=0 fm=(temp qpf) loc='' mi=50 fps=1
     while (($#)); do
         case $1 in
             -h) usage; exit 0 ;;
@@ -188,7 +193,13 @@ main() {
             -n) nws=1 ;;
             -l) latest=1 ;;
             -s) size=1 ;;
-            -f) fcast=1 ;;
+            -f)
+                fcast=1
+                if is_metric "${2-}"; then
+                    fm=("$2"); shift
+                    if is_metric "${2-}"; then fm+=("$2"); shift; fi
+                fi
+                ;;
             -r) mi=$(argval "$@"); shift ;;
             -F) fps=$(argval "$@"); shift ;;
             --) shift; break ;;
@@ -209,7 +220,7 @@ main() {
     local work gif ll name cols rows fh=0 fout
     ((size && !mpv)) && graphics_term && printf '\e[H\e[2J'
     if ((fcast)); then
-        fout=$("$(dirname "$0")/wxforecast" ${loc:+"$loc"} 2>&1) || { printf '%s\n' "$fout"; exit 1; }
+        fout=$("$(dirname "$0")/wxforecast" -y "${fm[@]}" ${loc:+"$loc"} 2>&1) || { printf '%s\n' "$fout"; exit 1; }
         printf '%s\n' "$fout"
         fh=$(wc -l <<<"$fout")
     fi

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Location and time helpers shared by wxradar and wxforecast
+# Location, time and chart metric helpers shared by wxradar and wxforecast
 
 # shellcheck disable=SC2034
 UA='wx (github.com/amazebb/scripts)'
@@ -36,3 +36,9 @@ iso_epoch() {
     local ts=${1%+00:00}Z
     date -d "$ts" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$ts" +%s
 }
+
+# chart metrics shared by wxforecast -y and wxradar -f
+METRICS='temp|feels|dew|hum|cloud|rain|qpf|snow|wind|gust|vis'
+
+# is_metric NAME: true when NAME is a chart metric
+is_metric() { [[ "|$METRICS|" == *"|$1|"* ]]; }

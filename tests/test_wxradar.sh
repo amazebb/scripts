@@ -109,9 +109,18 @@ radar_fps() {
 radar_forecast() {
   radar_shims
   local out
-  out=$("$BIN/wxradar" -f 10001 2>&1)
-  [[ $out == *"Temperature (°F)"* ]] &&
-    [[ ${out%%RainViewer*} == *"hourly forecast"* ]]
+  out=$("$BIN/wxradar" -f 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+  [[ $out == *"● Temperature (°F)   ◆ Expected rainfall (in/hr)"* && ${out%%RainViewer*} == *"hourly forecast"* ]]
+}
+
+# -f takes the metrics for the chart
+radar_forecast_metrics() {
+  radar_shims
+  local out
+  out=$("$BIN/wxradar" -f hum gust 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+  [[ $out == *"● Relative humidity (%)   ↗ Wind gust (mph)"* ]] || return 1
+  out=$("$BIN/wxradar" -f cloud 10001 2>&1)
+  [[ $out == *"Cloud cover (%)"* && $out != *"Expected rainfall"* ]]
 }
 
 # -f needs coordinates, not a station name
@@ -170,6 +179,7 @@ t "wxradar: -F frame rate" radar_fps
 t "wxradar: -s fills the terminal" radar_fill
 t "wxradar: -s leaves room for -f" radar_fill_minus_forecast
 t "wxradar: -f prints the forecast above the radar" radar_forecast
+t "wxradar: -f takes chart metrics" radar_forecast_metrics
 t "wxradar: -f rejects a station name" radar_forecast_needs_coords
 t "wxradar: region name" radar_region
 t "wxradar: mpv fallback" radar_mpv_fallback

@@ -269,11 +269,6 @@ forecast_for() {
         }' <(printf '%s\n' "$g") - <<<"$hourly"
 }
 
-METRICS='temp|feels|dew|hum|cloud|rain|qpf|snow|wind|gust|vis'
-
-# is_metric NAME: true when NAME is a chart metric
-is_metric() { [[ "|$METRICS|" == *"|$1|"* ]]; }
-
 main() {
     local hours=24 graph=1 metric=temp metric2="" units=imperial loc ll
     while (($#)); do

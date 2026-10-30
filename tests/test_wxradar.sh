@@ -73,27 +73,39 @@ radar_latest() {
   grep -q '/v2/radar/def' "$TMP/urls" && ! grep -q '/v2/radar/abc' "$TMP/urls"
 }
 
-# -f asks chafa to scale up to the terminal
+# -s asks chafa to scale up to the terminal
 radar_fill() {
   radar_shims
   shim chafa 'echo "$@" >"$TMP/chafa"'
-  TERM=xterm-ghostty "$BIN/wxradar" -f KOKX </dev/null >/dev/null 2>&1
+  TERM=xterm-ghostty "$BIN/wxradar" -s KOKX </dev/null >/dev/null 2>&1
   grep -q -- '--scale max' "$TMP/chafa"
 }
 
-# -t prints the hourly forecast before the radar status line
+# -s leaves room for the -f forecast chart
+radar_fill_minus_forecast() {
+  radar_shims
+  shim chafa 'echo "$@" >"$TMP/chafa"'
+  local a b
+  TERM=xterm-ghostty "$BIN/wxradar" -s 10001 </dev/null >/dev/null 2>&1
+  a=$(sed -n 's/.*--size [0-9]*x\([0-9]*\).*/\1/p' "$TMP/chafa")
+  TERM=xterm-ghostty "$BIN/wxradar" -f -s 10001 </dev/null >/dev/null 2>&1
+  b=$(sed -n 's/.*--size [0-9]*x\([0-9]*\).*/\1/p' "$TMP/chafa")
+  ((a > 0 && b > 0 && b < a))
+}
+
+# -f prints the forecast chart before the radar status line
 radar_forecast() {
   radar_shims
   local out
-  out=$("$BIN/wxradar" -t 10001 2>&1)
-  [[ $out == *"30-Oct 13:00   70°   40%  13 mph NW  Sunny"* ]] &&
+  out=$("$BIN/wxradar" -f 10001 2>&1)
+  [[ $out == *"Temperature (°F)"* ]] &&
     [[ ${out%%RainViewer*} == *"hourly forecast"* ]]
 }
 
-# -t needs coordinates, not a station name
+# -f needs coordinates, not a station name
 radar_forecast_needs_coords() {
   radar_shims
-  ! "$BIN/wxradar" -t KOKX >/dev/null 2>&1
+  ! "$BIN/wxradar" -f KOKX >/dev/null 2>&1
 }
 
 # a region name plays the NWS loop, upper-cased
@@ -142,9 +154,10 @@ t "wxradar: radius sets zoom" radar_radius_zoom
 t "wxradar: rejects bad radius" radar_bad_radius
 t "wxradar: -n uses the nearest NWS station" radar_nws
 t "wxradar: -l shows the latest only" radar_latest
-t "wxradar: -f fills the terminal" radar_fill
-t "wxradar: -t prints the forecast above the radar" radar_forecast
-t "wxradar: -t rejects a station name" radar_forecast_needs_coords
+t "wxradar: -s fills the terminal" radar_fill
+t "wxradar: -s leaves room for -f" radar_fill_minus_forecast
+t "wxradar: -f prints the forecast above the radar" radar_forecast
+t "wxradar: -f rejects a station name" radar_forecast_needs_coords
 t "wxradar: region name" radar_region
 t "wxradar: mpv fallback" radar_mpv_fallback
 t "wxradar: ghostty uses chafa" radar_chafa

@@ -830,15 +830,21 @@
     <b>wxforecast</b> - Print the hourly weather forecast for a US location
 
 <b>SYNOPSIS</b>
-    <b>wxforecast [-h] [-n hours]</b> [<u>location</u>]
+    <b>wxforecast [-h] [-r] [-y metric] [-n hours]</b> [<u>location</u>]
 
 <b>DESCRIPTION</b>
-    Prints one line per hour with the temperature, chance of rain, wind and
-    conditions, from the National Weather Service hourly forecast (free, no key).
-    With no <u>location</u> your IP address is used. US only.
+    Draws a chart of the National Weather Service hourly forecast (free, no key), with
+    time along the x axis, the y metric as a dot per hour and a weather emoji for each
+    hour under the axis. The chart shows as many hours as fit the terminal width.
+    With <b>-r</b> it prints one raw line per hour instead, with the temperature, chance of
+    rain, wind and conditions. With no <u>location</u> your IP address is used. US only.
 
 <b>OPTIONS</b>
     <b>-h</b>           Show this help message
+
+    <b>-r</b>           Print raw rows, one line per hour, instead of the chart
+
+    <b>-y</b> <u>metric</u>   Value for the chart y axis: <i>temp</i>, <i>rain</i> or <i>wind</i> <i>(default: temp)</i>
 
     <b>-n</b> <u>hours</u>    Number of hours to show, 1 to 156 <i>(default: 24)</i>
 
@@ -848,13 +854,17 @@
                   <i>40.71,-74.0</i>         latitude,longitude
 
 <b>EXAMPLES</b>
-    The next 24 hours where you are
+    Temperature chart with weather emoji for where you are
 
         wxforecast
 
-    The next 48 hours for a zip code
+    Chance of rain chart for a zip code
 
-        wxforecast -n 48 60601
+        wxforecast -y rain 60601
+
+    Raw rows for the next 48 hours
+
+        wxforecast -r -n 48 60601
 </pre>
 
 ## [wxradar](https://github.com/amazebb/scripts/blob/master/bin/wxradar)
@@ -864,7 +874,7 @@
     <b>wxradar</b> - Show an animated weather radar loop around a US location
 
 <b>SYNOPSIS</b>
-    <b>wxradar [-h] [-m] [-n] [-l] [-f] [-t] [-r miles]</b> [<u>location</u>]
+    <b>wxradar [-h] [-m] [-n] [-l] [-s] [-f] [-r miles]</b> [<u>location</u>]
 
 <b>DESCRIPTION</b>
     Builds a radar loop centred on <u>location</u> from RainViewer radar tiles over a
@@ -886,10 +896,11 @@
 
     <b>-l</b>           Show only the latest radar image instead of the loop
 
-    <b>-f</b>           Scale the image up to fill the terminal height <i>(fullscreen with mpv)</i>
+    <b>-s</b>           Scale the image up to fill the terminal height, less the height of
+                  the <b>-f</b> forecast <i>(fullscreen with mpv)</i>
 
-    <b>-t</b>           Print the next 24 hours of forecast as text above the radar, from
-                  <b>wxforecast</b>. Needs a zip or latitude,longitude
+    <b>-f</b>           Show the <b>wxforecast</b> chart above the radar. Needs a zip or
+                  latitude,longitude
 
     <b>-r</b> <u>miles</u>    Radius to show, about 10 to 400 <i>(default: 50)</i>
 
@@ -912,9 +923,9 @@
 
         wxradar -r 100 60601
 
-    The next 24 hours of weather as text above the radar
+    The forecast chart above a radar filling the rest of the terminal
 
-        wxradar -t 60601
+        wxradar -f -s 60601
 
     The latest image only
 

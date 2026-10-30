@@ -13,7 +13,7 @@ $(B NAME)
     $(B wxradar) - Show an animated weather radar loop around a US location
 
 $(B SYNOPSIS)
-    $(B "wxradar [-h] [-m] [-n] [-l] [-f] [-t] [-r miles]") [$(U location)]
+    $(B "wxradar [-h] [-m] [-n] [-l] [-s] [-f] [-r miles]") [$(U location)]
 
 $(B DESCRIPTION)
     Builds a radar loop centred on $(U location) from RainViewer radar tiles over a
@@ -35,10 +35,11 @@ $(B OPTIONS)
 
     $(B -l)           Show only the latest radar image instead of the loop
 
-    $(B -f)           Scale the image up to fill the terminal height $(I '(fullscreen with mpv)')
+    $(B -s)           Scale the image up to fill the terminal height, less the height of
+                  the $(B -f) forecast $(I '(fullscreen with mpv)')
 
-    $(B -t)           Print the next 24 hours of forecast as text above the radar, from
-                  $(B wxforecast). Needs a zip or latitude,longitude
+    $(B -f)           Show the $(B wxforecast) chart above the radar. Needs a zip or
+                  latitude,longitude
 
     $(B -r) $(U miles)    Radius to show, about 10 to 400 $(I '(default: 50)')
 
@@ -61,9 +62,9 @@ $(B EXAMPLES)
 
         wxradar -r 100 60601
 
-    The next 24 hours of weather as text above the radar
+    The forecast chart above a radar filling the rest of the terminal
 
-        wxradar -t 60601
+        wxradar -f -s 60601
 
     The latest image only
 
@@ -183,15 +184,15 @@ rainviewer() {
 }
 
 main() {
-    local mpv=0 nws=0 latest=0 fill=0 text=0 loc='' mi=50
+    local mpv=0 nws=0 latest=0 size=0 fcast=0 loc='' mi=50
     while (($#)); do
         case $1 in
             -h) usage; exit 0 ;;
             -m) mpv=1 ;;
             -n) nws=1 ;;
             -l) latest=1 ;;
-            -f) fill=1 ;;
-            -t) text=1 ;;
+            -s) size=1 ;;
+            -f) fcast=1 ;;
             -r) mi=$(argval "$@"); shift ;;
             --) shift; break ;;
             -*) warn "Unknown option: $1" ;;
@@ -206,8 +207,13 @@ main() {
 
     command -v curl &>/dev/null || warn "curl not found"
 
-    local work gif ll name
-    ((text)) && { "$(dirname "$0")/wxforecast" ${loc:+"$loc"} || exit 1; }
+    local work gif ll name cols rows fh=0 fout
+    ((size && !mpv)) && graphics_term && printf '\e[H\e[2J'
+    if ((fcast)); then
+        fout=$("$(dirname "$0")/wxforecast" ${loc:+"$loc"} 2>&1) || { printf '%s\n' "$fout"; exit 1; }
+        printf '%s\n' "$fout"
+        fh=$(wc -l <<<"$fout")
+    fi
     work=$(mktemp -d "${TMPDIR:-/tmp}/radar.XXXXXX") || exit 1
     trap 'rm -rf "$work"' EXIT
     gif=$work/radar.gif
@@ -229,14 +235,14 @@ main() {
 
     local -a loop=(--loop) chafa_args=() icat_args=(--align left)
     ((latest)) && loop=()
-    ((fill)) && loop+=(--fs)
-    if ((fill)); then
-        local cols rows
+    ((size)) && loop+=(--fs)
+    if ((size)); then
         read -r rows cols < <(stty size 2>/dev/null)
         cols=${cols:-80} rows=${rows:-24}
-        chafa_args=(--scale max --size "${cols}x$((rows - 1))")
-        icat_args=(--scale-up --place "${cols}x$((rows - 1))@0x0")
-        ((!mpv && !text)) && graphics_term && printf '\e[H\e[2J'
+        rows=$((rows - fh - 2))
+        ((rows < 5)) && rows=5
+        chafa_args=(--scale max --size "${cols}x$rows")
+        icat_args=(--scale-up --place "${cols}x$rows@0x$((fh + 1))")
     fi
     if ((!mpv)) && graphics_term && command -v chafa &>/dev/null; then
         chafa -f kitty "${chafa_args[@]}" "$gif"

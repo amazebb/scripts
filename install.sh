@@ -8,6 +8,6 @@ mkdir -p "$TARGET_DIR"
 
 for script in "$SCRIPT_DIR/bin"/*; do
   script_name=$(basename "$script")
-  ln -sf "$script" "$TARGET_DIR/$script_name"
+  ln -sfn "$script" "$TARGET_DIR/$script_name"
   echo "Linked $script_name"
 done

@@ -4,8 +4,8 @@
 # shellcheck disable=SC2034
 UA='wx (github.com/amazebb/scripts)'
 
-# directory of the running script, which also holds the *.awk files
-AWKDIR=$(dirname "$0")
+# directory of the *.awk files, next to this file
+AWKDIR=$(dirname "$0")/wx
 
 # latlon LOCATION: print "lat lon" for a zip, "lat,lon" or the IP location
 latlon() {

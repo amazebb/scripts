@@ -3,7 +3,8 @@
 
 # shellcheck disable=SC2016
 source "$(dirname "$0")/common.sh"
-source "$(dirname "$0")/wxgeo.sh"
+# shellcheck source=wx/wxgeo.sh
+source "$(dirname "$0")/wx/wxgeo.sh"
 
 BASE=https://radar.weather.gov/ridge/standard
 

@@ -13,7 +13,7 @@ function mv(m, i) {
     if (m == "hum") return hum[i]
     if (m == "cloud") return cloud[i]
     if (m == "rain") return rain[i]
-    if (m == "qpf") return amt[i]
+    if (m == "amt") return amt[i]
     if (m == "snow") return snow[i]
     if (m == "wind") return wind[i]
     if (m == "gust") return gust[i]
@@ -22,7 +22,7 @@ function mv(m, i) {
 }
 /"startTime"/ {
     t = val($0); n++; e = epochh(t)
-    amt[n] = grid("qpf", e) / (si ? 1 : 25.4)
+    amt[n] = grid("amt", e) / (si ? 1 : 25.4)
     snow[n] = grid("snow", e) / (si ? 1 : 25.4)
     gust[n] = grid("gust", e) / (si ? 1 : 1.609344)
     cloud[n] = grid("cloud", e)
@@ -45,7 +45,7 @@ function mv(m, i) {
 /"windSpeed"/ { wind[n] = val($0) * (si ? 1.609344 : 1); ws[n] = sprintf("%.0f %s", wind[n], si ? "km/h" : "mph") }
 /"windDirection"/ { wd[n] = val($0) }
 /"shortForecast"/ { sky[n] = val($0); em[n] = emoji(val($0), day) }
-function isfrac(m) { return m == "qpf" || m == "snow" || m == "vis" }
+function isfrac(m) { return m == "amt" || m == "snow" || m == "vis" }
 function iswind(m) { return m == "wind" || m == "gust" }
 function ttl(m,    u) {
     u = si ? "C" : "F"
@@ -54,8 +54,8 @@ function ttl(m,    u) {
     if (m == "cloud") return "Cloud cover (%)"
     if (m == "dew") return "Dew point (°" u ")"
     if (m == "feels") return "Feels like (°" u ")"
-    if (m == "qpf") return "Expected rainfall (" (si ? "mm" : "in") "/hr)"
-    if (m == "snow") return "Expected snowfall (" (si ? "mm" : "in") "/hr)"
+    if (m == "amt") return "Expected rainfall (" (si ? "mm" : "in") ")"
+    if (m == "snow") return "Expected snowfall (" (si ? "mm" : "in") ")"
     if (m == "wind") return "Wind speed (" (si ? "km/h" : "mph") ")"
     if (m == "gust") return "Wind gust (" (si ? "km/h" : "mph") ")"
     if (m == "vis") return "Visibility (" (si ? "km" : "mi") ")"
@@ -69,7 +69,7 @@ function setup(a, cnt,    i, l, h, mn, m) {
     for (i = 1; i <= cnt; i++) { if (ya[a, i] < l) l = ya[a, i]; if (ya[a, i] > h) h = ya[a, i] }
     if (m == "rain" || m == "hum" || m == "cloud") { l = 0; h = 100 }
     if (isfrac(m)) {
-        l = 0; mn = m == "qpf" ? (si ? 2 : 0.1) : m == "snow" ? (si ? 25 : 1) : (si ? 10 : 6)
+        l = 0; mn = m == "amt" ? (si ? 2 : 0.1) : m == "snow" ? (si ? 25 : 1) : (si ? 10 : 6)
         if (h < mn) h = mn
     } else if (h - l < H - 1) h = l + H - 1
     lo[a] = l; hi[a] = h
@@ -77,7 +77,7 @@ function setup(a, cnt,    i, l, h, mn, m) {
 function row(a, i) { return int((ya[a, i] - lo[a]) / (hi[a] - lo[a]) * (H - 1) + 0.5) }
 function lab(a, v,    m) {
     m = met[a]
-    return m == "qpf" ? sprintf(si ? "%.1f" : "%.2f", v) : isfrac(m) ? sprintf("%.1f", v) : sprintf("%d", v + 0.5)
+    return m == "amt" ? sprintf(si ? "%.1f" : "%.2f", v) : isfrac(m) ? sprintf("%.1f", v) : sprintf("%d", v + 0.5)
 }
 # arrow(I): arrow pointing where the wind blows, from the 16 point direction wd[I]
 function arrow(i,    k, names, ar, idx) {

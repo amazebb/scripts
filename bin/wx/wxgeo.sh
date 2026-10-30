@@ -42,7 +42,7 @@ iso_epoch() {
 }
 
 # chart metrics shared by wxforecast -y and wxradar -f
-METRICS='temp|feels|dew|hum|cloud|rain|qpf|snow|wind|gust|vis'
+METRICS='temp|feels|dew|hum|cloud|rain|amt|snow|wind|gust|vis'
 
 # is_metric NAME: true when NAME is a chart metric
 is_metric() { [[ "|$METRICS|" == *"|$1|"* ]]; }

@@ -36,20 +36,25 @@ $(B OPTIONS)
                   the chance of rain on a right hand axis, or one line per day with $(B -r), which
                   adds the day's total rainfall and snowfall, lowest and highest
                   humidity (HL, HH) and peak gust.
-                  $(B -y) does not apply
+                  $(B -y) chooses the right axis
 
     $(B -r)           Print raw rows, one line per hour, instead of the chart
 
-    $(B -y) $(U metric) [$(U metric2)]  Value for the chart y axis $(I '(default: temp qpf)'). A second metric
+    $(B -y) $(U metric) [$(U metric2)]  Value for the chart y axis $(I '(default: temp amt)'). A second metric
                   goes on a right hand axis with its own scale, drawn as orange $(I ◆)
                   markers and labels. Wind and gust use an arrow pointing the way the wind blows
 
                   $(I temp)    temperature          $(I rain)   chance of rain
-                  $(I feels)   feels-like           $(I qpf)    expected rainfall
-                  $(I dew)     dew point            $(I snow)   expected snowfall
+                  $(I feels)   feels-like           $(I amt)    expected rainfall per hour
+                  $(I dew)     dew point            $(I snow)   expected snowfall per hour
                   $(I hum)     relative humidity    $(I wind)   wind speed
                   $(I cloud)   cloud cover          $(I gust)   wind gust
                                                 $(I vis)    visibility
+
+                  With $(B -d) the left axis is always the daily high and low, and a single
+                  metric chooses the right axis $(I '(default: rain)'): $(I rain) chance, $(I amt)
+                  expected rainfall for the day, $(I snow) expected snowfall for the day, $(I hl) and
+                  $(I hh) lowest and highest humidity, $(I gust) peak gust or $(I wind)
 
     $(B -u) $(U units)    $(I imperial) (°F, mph, in) or $(I si) (°C, km/h, mm) $(I '(default: imperial)')
 
@@ -68,7 +73,7 @@ $(B EXAMPLES)
 
     Expected rainfall chart for a zip code
 
-        wxforecast -y qpf 60601
+        wxforecast -y amt 60601
 
     Relative humidity chart
 
@@ -77,6 +82,10 @@ $(B EXAMPLES)
     The week ahead
 
         wxforecast -d
+
+    The week ahead with the total rainfall on the right axis
+
+        wxforecast -d -y amt
 
     Temperature only
 
@@ -128,8 +137,8 @@ forecast_for() {
     awk -v hours="$3" -v metric="$4" -v graph="$5" -v metric2="$7" -v cols="$cols" -v si="$([[ $6 == si ]] && echo 1 || echo 0)" -f "$AWKDIR/wx-time.awk" -f "$AWKDIR/wx-emoji.awk" -f "$AWKDIR/wxforecast-hourly.awk" <(printf '%s\n' "$g") - <<<"$hourly"
 }
 
-# daily_for LAT LON DAYS UNITS GRAPH: print the NWS 12 hour forecast periods as a high and low chart,
-# or one row per day when GRAPH is 0
+# daily_for LAT LON DAYS UNITS GRAPH METRIC: print the NWS 12 hour forecast periods as a high and low
+# chart with METRIC on the right axis, or one row per day when GRAPH is 0
 daily_for() {
     local pt url grid g place daily
     pt=$(curl -fsSL -A "$UA" "https://api.weather.gov/points/$1,$2") || warn "No NWS forecast for $1,$2 (US only)"
@@ -139,11 +148,14 @@ daily_for() {
     place=$(place_of "$pt")
     daily=$(curl -fsSL -A "$UA" "$url") || warn "Could not fetch the daily forecast"
     info "${place:-$1,$2} daily forecast (NWS)$(stamps_of "$daily")"
-    awk -v ndays="$3" -v graph="$5" -v si="$([[ $4 == si ]] && echo 1 || echo 0)" -f "$AWKDIR/wx-time.awk" -f "$AWKDIR/wx-emoji.awk" -f "$AWKDIR/wxforecast-daily.awk" <(printf '%s\n' "$g") - <<<"$daily"
+    awk -v ndays="$3" -v graph="$5" -v metric="$6" -v si="$([[ $4 == si ]] && echo 1 || echo 0)" -f "$AWKDIR/wx-time.awk" -f "$AWKDIR/wx-emoji.awk" -f "$AWKDIR/wxforecast-daily.awk" <(printf '%s\n' "$g") - <<<"$daily"
 }
 
+# metrics for the right axis of the daily chart
+DMETRICS='rain|amt|snow|hl|hh|gust|wind'
+
 main() {
-    local hours="" alerts=1 daily=0 graph=1 metric=temp metric2=qpf units=imperial loc ll
+    local hours="" alerts=1 daily=0 graph=1 metric=temp metric2=amt ygiven=0 dmetric=rain units=imperial loc ll
     while (($#)); do
         case $1 in
         -h)
@@ -155,6 +167,7 @@ main() {
         -r) graph=0 ;;
         -y)
             metric=$(argval "$@")
+            ygiven=1
             metric2=""
             shift
             if is_metric "${2-}"; then
@@ -191,14 +204,22 @@ main() {
         ((hours >= 1 && hours <= 156)) || warn "Hours must be 1 to 156"
     fi
     [[ $units == @(imperial|si) ]] || warn "Units must be imperial or si"
-    is_metric "$metric" || warn "Metric must be ${METRICS//|/, }"
+    if ((daily)); then
+        if ((ygiven)); then
+            [[ "|$DMETRICS|" == *"|$metric|"* ]] || warn "With -d the metric must be ${DMETRICS//|/, }"
+            [[ -z $metric2 ]] || warn "With -d -y takes one metric, for the right axis"
+            dmetric=$metric
+        fi
+    else
+        is_metric "$metric" || warn "Metric must be ${METRICS//|/, }"
+    fi
 
     command -v curl &>/dev/null || warn "curl not found"
     ll=$(latlon "$loc") || warn "Forecast needs a zip code or latitude,longitude"
     ((alerts)) && "$(dirname "$0")/wxalerts" -b "${ll// /,}" >&2
     if ((daily)); then
         # shellcheck disable=SC2086
-        daily_for $ll "$hours" "$units" "$graph"
+        daily_for $ll "$hours" "$units" "$graph" "$dmetric"
     else
         # shellcheck disable=SC2086
         forecast_for $ll "$hours" "$metric" "$graph" "$units" "$metric2"

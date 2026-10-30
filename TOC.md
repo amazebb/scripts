@@ -897,20 +897,25 @@
                   the chance of rain on a right hand axis, or one line per day with <b>-r</b>, which
                   adds the day's total rainfall and snowfall, lowest and highest
                   humidity (HL, HH) and peak gust.
-                  <b>-y</b> does not apply
+                  <b>-y</b> chooses the right axis
 
     <b>-r</b>           Print raw rows, one line per hour, instead of the chart
 
-    <b>-y</b> <u>metric</u> [<u>metric2</u>]  Value for the chart y axis <i>(default: temp qpf)</i>. A second metric
+    <b>-y</b> <u>metric</u> [<u>metric2</u>]  Value for the chart y axis <i>(default: temp amt)</i>. A second metric
                   goes on a right hand axis with its own scale, drawn as orange <i>◆</i>
                   markers and labels. Wind and gust use an arrow pointing the way the wind blows
 
                   <i>temp</i>    temperature          <i>rain</i>   chance of rain
-                  <i>feels</i>   feels-like           <i>qpf</i>    expected rainfall
-                  <i>dew</i>     dew point            <i>snow</i>   expected snowfall
+                  <i>feels</i>   feels-like           <i>amt</i>    expected rainfall per hour
+                  <i>dew</i>     dew point            <i>snow</i>   expected snowfall per hour
                   <i>hum</i>     relative humidity    <i>wind</i>   wind speed
                   <i>cloud</i>   cloud cover          <i>gust</i>   wind gust
                                                 <i>vis</i>    visibility
+
+                  With <b>-d</b> the left axis is always the daily high and low, and a single
+                  metric chooses the right axis <i>(default: rain)</i>: <i>rain</i> chance, <i>amt</i>
+                  expected rainfall for the day, <i>snow</i> expected snowfall for the day, <i>hl</i> and
+                  <i>hh</i> lowest and highest humidity, <i>gust</i> peak gust or <i>wind</i>
 
     <b>-u</b> <u>units</u>    <i>imperial</i> (°F, mph, in) or <i>si</i> (°C, km/h, mm) <i>(default: imperial)</i>
 
@@ -929,7 +934,7 @@
 
     Expected rainfall chart for a zip code
 
-        wxforecast -y qpf 60601
+        wxforecast -y amt 60601
 
     Relative humidity chart
 
@@ -938,6 +943,10 @@
     The week ahead
 
         wxforecast -d
+
+    The week ahead with the total rainfall on the right axis
+
+        wxforecast -d -y amt
 
     Temperature only
 
@@ -1023,7 +1032,7 @@
 
     <b>-f</b> [<u>metric</u> [<u>metric2</u>]]
                   Choose the <b>wxforecast</b> y axis metrics for the chart shown above the
-                  radar <i>(default: temp qpf)</i>. The chart is shown by default for a zip,
+                  radar <i>(default: temp amt)</i>. The chart is shown by default for a zip,
                   latitude,longitude or your IP location, and is skipped for station and
                   region names. Giving <b>-f</b> with a name is an error
 

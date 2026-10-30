@@ -3,9 +3,9 @@
 # Used by wxforecast grid_hours, with wx-time.awk.
 
 BEGIN {
-    f["quantitativePrecipitation"] = "qpf"; f["snowfallAmount"] = "snow"; f["windGust"] = "gust"
+    f["quantitativePrecipitation"] = "amt"; f["snowfallAmount"] = "snow"; f["windGust"] = "gust"
     f["skyCover"] = "cloud"; f["apparentTemperature"] = "feels"; f["visibility"] = "vis"; f["relativeHumidity"] = "hum"
-    total["qpf"] = total["snow"] = 1
+    total["amt"] = total["snow"] = 1
 }
 /^        "[A-Za-z]+": *\{/ { split($1, kk, "\""); name = (kk[2] in f) ? f[kk[2]] : "" }
 name != "" && /"validTime"/ {

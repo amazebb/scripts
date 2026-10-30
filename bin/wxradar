@@ -41,7 +41,7 @@ $(B OPTIONS)
 
     $(B -f) [$(U metric) [$(U metric2)]]
                   Choose the $(B wxforecast) y axis metrics for the chart shown above the
-                  radar $(I '(default: temp qpf)'). The chart is shown by default for a zip,
+                  radar $(I '(default: temp amt)'). The chart is shown by default for a zip,
                   latitude,longitude or your IP location, and is skipped for station and
                   region names. Giving $(B -f) with a name is an error
 
@@ -173,7 +173,7 @@ rainviewer() {
 }
 
 main() {
-    local mpv=0 nws=0 latest=0 size=0 fcast=1 fexplicit=0 fm=(temp qpf) loc='' mi=50 fps=1
+    local mpv=0 nws=0 latest=0 size=0 fcast=1 fexplicit=0 fm=(temp amt) loc='' mi=50 fps=1
     while (($#)); do
         case $1 in
             -h) usage; exit 0 ;;

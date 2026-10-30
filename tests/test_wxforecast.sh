@@ -46,7 +46,7 @@ fc_default_metrics() {
   fc_shims
   local out
   out=$("$BIN/wxforecast" 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
-  [[ $out == *"● Temperature (°F)   ◆ Expected rainfall (in/hr)"* ]] || return 1
+  [[ $out == *"● Temperature (°F)   ◆ Expected rainfall (in)"* ]] || return 1
   out=$("$BIN/wxforecast" -y temp 10001 2>&1)
   [[ $out == *"Temperature (°F)"* && $out != *"Expected rainfall"* ]]
 }
@@ -99,6 +99,18 @@ fc_daily_chart() {
   [[ $out == *"|Fri"* && $out == *"|30-Oct"* && $out == *"│ 100"* && $out == *"◆"* ]]
 }
 
+# -d -y picks the right axis metric from the daily ones only
+fc_daily_y() {
+  fc_shims
+  local out
+  out=$("$BIN/wxforecast" -d -y amt 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+  [[ $out == *"▲ High  ▼ Low (°F)   ◆ Expected rainfall (in)"* && $out == *"│ 0.50"* ]] || return 1
+  [[ $("$BIN/wxforecast" -d -y hh 10001 2>&1) == *"Humidity high (%)"* ]] || return 1
+  [[ $("$BIN/wxforecast" -d -y gust 10001 2>&1) == *"Peak gust (mph)"* ]] || return 1
+  ! "$BIN/wxforecast" -d -y temp 10001 >/dev/null 2>&1 && ! "$BIN/wxforecast" -d -y rain wind 10001 >/dev/null 2>&1 &&
+    ! "$BIN/wxforecast" -y hl 10001 >/dev/null 2>&1
+}
+
 # -u si converts to C, km/h and mm
 fc_si() {
   fc_shims
@@ -127,18 +139,18 @@ fc_grid_metrics() {
 fc_second_axis() {
   fc_shims
   local out
-  out=$("$BIN/wxforecast" -y temp qpf 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
-  [[ $out == *"● Temperature (°F)   ◆ Expected rainfall (in/hr)"* && $out == *"◆"*"│ 0.10"* ]] || return 1
+  out=$("$BIN/wxforecast" -y temp amt 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+  [[ $out == *"● Temperature (°F)   ◆ Expected rainfall (in)"* && $out == *"◆"*"│ 0.10"* ]] || return 1
   out=$("$BIN/wxforecast" -y temp wind 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
   [[ $out == *"↘"* ]] && ! "$BIN/wxforecast" -y temp x 10001 >/dev/null 2>&1
 }
 
-# -y qpf charts the expected rainfall spread over the grid block
-fc_qpf() {
+# -y amt charts the expected rainfall spread over the grid block
+fc_amt() {
   fc_shims
   local out
-  out=$("$BIN/wxforecast" -y qpf 10001 2>&1)
-  [[ $out == *"Expected rainfall (in/hr)"* && $out == *"0.10 │ ●  ●"* ]]
+  out=$("$BIN/wxforecast" -y amt 10001 2>&1)
+  [[ $out == *"Expected rainfall (in)"* && $out == *"0.10 │ ●  ●"* ]]
 }
 
 # -y picks the y metric
@@ -158,17 +170,18 @@ t "wxforecast: -r rows for a zip" fc_rows
 t "wxforecast: -n limits the raw rows" fc_hours
 t "wxforecast: no argument uses ip location (raw)" fc_ip
 t "wxforecast: rejects bad hours" fc_bad_hours
-t "wxforecast: default temp and qpf" fc_default_metrics
+t "wxforecast: default temp and amt" fc_default_metrics
 t "wxforecast: default chart" fc_graph
 t "wxforecast: status line shows update times" fc_stamps
 t "wxforecast: -d -r daily rows" fc_daily
 t "wxforecast: -d daily chart" fc_daily_chart
 t "wxforecast: alert banner and -A" fc_alert_banner
+t "wxforecast: -d -y right axis metric" fc_daily_y
 t "wxforecast: -u si" fc_si
 t "wxforecast: -y hum and dew" fc_hum_dew
 t "wxforecast: -y gust, cloud and feels" fc_grid_metrics
 t "wxforecast: -y with a second metric" fc_second_axis
-t "wxforecast: -y qpf" fc_qpf
+t "wxforecast: -y amt" fc_amt
 t "wxforecast: -y metric" fc_graph_metric
 t "wxforecast: rejects a station name" fc_needs_coords
 

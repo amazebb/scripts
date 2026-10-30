@@ -110,7 +110,7 @@ radar_forecast() {
   radar_shims
   local out
   out=$("$BIN/wxradar" 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
-  [[ $out == *"● Temperature (°F)   ◆ Expected rainfall (in/hr)"* && ${out%%RainViewer*} == *"hourly forecast"* ]]
+  [[ $out == *"● Temperature (°F)   ◆ Expected rainfall (in)"* && ${out%%RainViewer*} == *"hourly forecast"* ]]
 }
 
 # the chart is on by default; -R and station or region names skip it

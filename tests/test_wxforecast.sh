@@ -5,7 +5,7 @@ source "$(dirname "$0")/lib.sh"
 # curl fakes the zip, points and hourly forecast apis with two periods
 fc_shims() {
   shim curl 'case "$*" in
-  *forecast/hourly*) for h in 13 14; do printf "{\n\"startTime\": \"2026-10-30T$h:00:00-04:00\",\n\"isDaytime\": true,\n\"temperature\": 70,\n\"probabilityOfPrecipitation\": {\n\"value\": 40\n},\n\"windSpeed\": \"13 mph\",\n\"windDirection\": \"NW\",\n\"shortForecast\": \"Sunny\",\n}\n"; done ;;
+  *forecast/hourly*) for h in 13 14; do printf "{\n\"startTime\": \"2026-10-30T$h:00:00-04:00\",\n\"isDaytime\": true,\n\"temperature\": 70,\n\"probabilityOfPrecipitation\": {\n\"value\": 40\n},\n\"dewpoint\": {\n\"value\": 10\n},\n\"relativeHumidity\": {\n\"value\": 45\n},\n\"windSpeed\": \"13 mph\",\n\"windDirection\": \"NW\",\n\"shortForecast\": \"Sunny\",\n}\n"; done ;;
   *gridpoints*) printf "        \"quantitativePrecipitation\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 5.08\n}\n]\n},\n        \"snowfallAmount\": {\n" ;;
   *api.weather.gov*) echo "\"forecastHourly\": \"https://api.weather.gov/gridpoints/X/1,1/forecast/hourly\", \"forecastGridData\": \"https://api.weather.gov/gridpoints/X/1,1\"" ;;
   *zippopotam*) echo "{\"places\":[{\"longitude\": \"-73.9967\", \"latitude\": \"40.7484\"}]}" ;;
@@ -18,7 +18,7 @@ fc_rows() {
   fc_shims
   local out
   out=$("$BIN/wxforecast" -r 10001 2>&1)
-  [[ $out == *"30-Oct 13:00   70°F   40%     0.10  13 mph NW   Sunny"* && $out == *"30-Oct 14:00"* ]]
+  [[ $out == *"30-Oct 13:00  70°F  50°F  45%  40%     0.10  13 mph NW   Sunny"* && $out == *"30-Oct 14:00"* ]]
 }
 
 # -n limits the rows
@@ -52,8 +52,15 @@ fc_si() {
   fc_shims
   local out
   out=$("$BIN/wxforecast" -r -u si 10001 2>&1)
-  [[ $out == *"AMT(mm)"* && $out == *"30-Oct 13:00   21°C   40%      2.5  21 km/h NW"* ]] &&
+  [[ $out == *"AMT(mm)"* && $out == *"30-Oct 13:00  21°C  10°C  45%  40%      2.5  21 km/h NW"* ]] &&
     ! "$BIN/wxforecast" -u x 10001 >/dev/null 2>&1
+}
+
+# -y hum and -y dew chart the forecast humidity and dew point
+fc_hum_dew() {
+  fc_shims
+  "$BIN/wxforecast" -y hum 10001 2>&1 | grep -q 'Relative humidity (%)' &&
+    "$BIN/wxforecast" -y dew 10001 2>&1 | grep -q 'Dew point (°F)'
 }
 
 # -y qpf charts the expected rainfall spread over the grid block
@@ -83,6 +90,7 @@ t "wxforecast: no argument uses ip location (raw)" fc_ip
 t "wxforecast: rejects bad hours" fc_bad_hours
 t "wxforecast: default chart" fc_graph
 t "wxforecast: -u si" fc_si
+t "wxforecast: -y hum and dew" fc_hum_dew
 t "wxforecast: -y qpf" fc_qpf
 t "wxforecast: -y metric" fc_graph_metric
 t "wxforecast: rejects a station name" fc_needs_coords

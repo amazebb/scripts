@@ -899,14 +899,14 @@
     <b>wxradar</b> - Show an animated weather radar loop around a US location
 
 <b>SYNOPSIS</b>
-    <b>wxradar [-h] [-m] [-n] [-l] [-s] [-f] [-r miles]</b> [<u>location</u>]
+    <b>wxradar [-h] [-m] [-n] [-l] [-s] [-f] [-r miles] [-F fps]</b> [<u>location</u>]
 
 <b>DESCRIPTION</b>
     Builds a radar loop centred on <u>location</u> from RainViewer radar tiles over a
     map, covering <b>-r</b> miles in every direction. With no <u>location</u> your IP address
     is used. With <b>-n</b>, or for a radar station or region name, the fixed NWS loop from
     radar.weather.gov is played instead (nearest station, about 140 miles) and
-    <b>-r</b> is ignored. Only the RainViewer loop needs ffmpeg.
+    <b>-r</b> and <b>-F</b> are ignored. Only the RainViewer loop needs ffmpeg.
     Map data is from OpenStreetMap, radar from RainViewer.
 
     In kitty or ghostty the gif is drawn directly in the terminal with <b>chafa</b>
@@ -928,6 +928,8 @@
                   latitude,longitude
 
     <b>-r</b> <u>miles</u>    Radius to show, about 10 to 400 <i>(default: 50)</i>
+
+    <b>-F</b> <u>fps</u>      Frames per second of the RainViewer loop, 0.1 to 30 <i>(default: 1)</i>
 
     [<u>location</u>]    One of the following <i>(default: your IP location)</i>
 

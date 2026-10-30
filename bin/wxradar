@@ -13,14 +13,14 @@ $(B NAME)
     $(B wxradar) - Show an animated weather radar loop around a US location
 
 $(B SYNOPSIS)
-    $(B "wxradar [-h] [-m] [-n] [-l] [-s] [-f] [-r miles]") [$(U location)]
+    $(B "wxradar [-h] [-m] [-n] [-l] [-s] [-f] [-r miles] [-F fps]") [$(U location)]
 
 $(B DESCRIPTION)
     Builds a radar loop centred on $(U location) from RainViewer radar tiles over a
     map, covering $(B -r) miles in every direction. With no $(U location) your IP address
     is used. With $(B -n), or for a radar station or region name, the fixed NWS loop from
     radar.weather.gov is played instead (nearest station, about 140 miles) and
-    $(B -r) is ignored. Only the RainViewer loop needs ffmpeg.
+    $(B -r) and $(B -F) are ignored. Only the RainViewer loop needs ffmpeg.
     Map data is from OpenStreetMap, radar from RainViewer.
 
     In kitty or ghostty the gif is drawn directly in the terminal with $(B chafa)
@@ -42,6 +42,8 @@ $(B OPTIONS)
                   latitude,longitude
 
     $(B -r) $(U miles)    Radius to show, about 10 to 400 $(I '(default: 50)')
+
+    $(B -F) $(U fps)      Frames per second of the RainViewer loop, 0.1 to 30 $(I '(default: 1)')
 
     [$(U location)]    One of the following $(I '(default: your IP location)')
 
@@ -126,7 +128,7 @@ stitch() {
 
 # rainviewer LAT LON MILES LATEST OUT LABEL: write a radar loop gif centred on LAT LON, one frame if LATEST is 1
 rainviewer() {
-    local lat=$1 lon=$2 mi=$3 latest=$4 out=$5 label=$6 d z x0 y0 cols rows cx cy size host
+    local lat=$1 lon=$2 mi=$3 latest=$4 out=$5 label=$6 fps=$7 d z x0 y0 cols rows cx cy size host
     local stamp labels="" t m mx0 my0 mcols mrows mcx mcy msize
     local -a paths times curl_args
     local i j f k
@@ -172,13 +174,13 @@ rainviewer() {
             labels+="drawtext=font=monospace:text='${t//:/\\:}':x=8:y=8:fontsize=22:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6:enable='eq(n,$f)',"
         done
     fi
-    ffmpeg -nostdin -loglevel error -y -loop 1 -framerate 4 -i "$d/base.png" -framerate 4 -i "$d/R_%02d.png" \
+    ffmpeg -nostdin -loglevel error -y -loop 1 -framerate "$fps" -i "$d/base.png" -framerate "$fps" -i "$d/R_%02d.png" \
         -filter_complex "[0]crop=$msize:$msize:$mcx:$mcy,scale=720:720:flags=lanczos[bg];[1]crop=$size:$size:$cx:$cy,scale=720:720:flags=lanczos[fg];[bg][fg]overlay=shortest=1,${labels}drawbox=x=iw/2-14:y=ih/2-4:w=28:h=8:color=black:t=fill,drawbox=x=iw/2-4:y=ih/2-14:w=8:h=28:color=black:t=fill,drawbox=x=iw/2-12:y=ih/2-2:w=24:h=4:color=white:t=fill,drawbox=x=iw/2-2:y=ih/2-12:w=4:h=24:color=white:t=fill,split[a][b];[a]palettegen[p];[b][p]paletteuse" \
         -f gif "$out"
 }
 
 main() {
-    local mpv=0 nws=0 latest=0 size=0 fcast=0 loc='' mi=50
+    local mpv=0 nws=0 latest=0 size=0 fcast=0 loc='' mi=50 fps=1
     while (($#)); do
         case $1 in
             -h) usage; exit 0 ;;
@@ -188,6 +190,7 @@ main() {
             -s) size=1 ;;
             -f) fcast=1 ;;
             -r) mi=$(argval "$@"); shift ;;
+            -F) fps=$(argval "$@"); shift ;;
             --) shift; break ;;
             -*) warn "Unknown option: $1" ;;
             *) break ;;
@@ -198,6 +201,8 @@ main() {
     loc=${1-}
     [[ $mi =~ ^[0-9]+$ ]] || warn "Radius must be a number of miles"
     ((mi >= 10 && mi <= 400)) || warn "Radius must be 10 to 400 miles"
+    [[ $fps =~ ^[0-9]+(\.[0-9]+)?$ ]] || warn "FPS must be a number"
+    awk -v f="$fps" 'BEGIN { exit !(f >= 0.1 && f <= 30) }' || warn "FPS must be 0.1 to 30"
 
     command -v curl &>/dev/null || warn "curl not found"
 
@@ -217,7 +222,7 @@ main() {
             name=$(station_for $ll)
         else
             # shellcheck disable=SC2086
-            rainviewer $ll "$mi" "$latest" "$gif" "${loc:-IP location}"
+            rainviewer $ll "$mi" "$latest" "$gif" "${loc:-IP location}" "$fps"
         fi
     else
         name=$(tr "[:lower:]" "[:upper:]" <<<"$loc")

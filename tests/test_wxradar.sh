@@ -13,7 +13,7 @@ case "$*" in
   *ipinfo*) echo "40.7484,-73.9967" ;;
   *radar.weather.gov*) printf GIF >"$3" ;;
 esac'
-  shim ffmpeg '[ "$1" = -hide_banner ] && exit 0; for a; do o=$a; done; : >"$o"'
+  shim ffmpeg '[ "$1" = -hide_banner ] && exit 0; echo "$@" >>"$TMP/ffargs"; for a; do o=$a; done; : >"$o"'
   shim mpv 'echo played >>"$TMP/played"'
   rm -f "$TMP/urls"
   unset KITTY_WINDOW_ID TERM_PROGRAM
@@ -93,6 +93,18 @@ radar_fill_minus_forecast() {
   ((a > 0 && b > 0 && b < a))
 }
 
+# -F sets the loop frame rate, 1 fps by default
+radar_fps() {
+  radar_shims
+  rm -f "$TMP/ffargs"
+  "$BIN/wxradar" 10001 >/dev/null 2>&1
+  grep filter_complex "$TMP/ffargs" | grep -q -- '-framerate 1 -i' || return 1
+  rm -f "$TMP/ffargs"
+  "$BIN/wxradar" -F 2.5 10001 >/dev/null 2>&1
+  grep filter_complex "$TMP/ffargs" | grep -q -- '-framerate 2.5 -i' || return 1
+  ! "$BIN/wxradar" -F 0 10001 >/dev/null 2>&1 && ! "$BIN/wxradar" -F fast 10001 >/dev/null 2>&1
+}
+
 # -f prints the forecast chart before the radar status line
 radar_forecast() {
   radar_shims
@@ -154,6 +166,7 @@ t "wxradar: radius sets zoom" radar_radius_zoom
 t "wxradar: rejects bad radius" radar_bad_radius
 t "wxradar: -n uses the nearest NWS station" radar_nws
 t "wxradar: -l shows the latest only" radar_latest
+t "wxradar: -F frame rate" radar_fps
 t "wxradar: -s fills the terminal" radar_fill
 t "wxradar: -s leaves room for -f" radar_fill_minus_forecast
 t "wxradar: -f prints the forecast above the radar" radar_forecast

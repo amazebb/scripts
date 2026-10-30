@@ -1,0 +1,247 @@
+#!/usr/bin/env bash
+# Show the animated NWS weather radar loop for a US location
+
+# shellcheck disable=SC2016
+source "$(dirname "$0")/common.sh"
+
+BASE=https://radar.weather.gov/ridge/standard
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B radar) - Show an animated weather radar loop around a US location
+
+$(B SYNOPSIS)
+    $(B "radar [-h] [-m] [-n] [-l] [-f] [-r miles]") [$(U location)]
+
+$(B DESCRIPTION)
+    Builds a radar loop centred on $(U location) from RainViewer radar tiles over a
+    map, covering $(B -r) miles in every direction. With no $(U location) your IP address
+    is used. With $(B -n), or for a radar station or region name, the fixed NWS loop from
+    radar.weather.gov is played instead (nearest station, about 140 miles) and
+    $(B -r) is ignored. Only the RainViewer loop needs ffmpeg.
+    Map data is from OpenStreetMap, radar from RainViewer.
+
+    In kitty or ghostty the gif is drawn directly in the terminal with $(B chafa)
+    ($(I Ctrl-C) to quit) or $(B kitten) if installed, otherwise it is played with mpv.
+
+$(B OPTIONS)
+    $(B -h)           Show this help message
+
+    $(B -m)           Play with mpv even when the terminal can show the gif itself
+
+    $(B -n)           Play the NWS loop of the nearest radar station
+
+    $(B -l)           Show only the latest radar image instead of the loop
+
+    $(B -f)           Scale the image up to fill the terminal height $(I '(fullscreen with mpv)')
+
+    $(B -r) $(U miles)    Radius to show, about 10 to 400 $(I '(default: 50)')
+
+    [$(U location)]    One of the following $(I '(default: your IP location)')
+
+                  $(I 10001)               zip code
+                  $(I 40.71,-74.0)         latitude,longitude
+                  $(I KOKX)                NWS radar station, e.g. KOKX, KDIX, KLOT
+                  $(I northeast)           NWS region loop:
+                                      northeast southeast southmissvly southplains
+                                      northrockies uppermissvly centgrlakes conus
+                                      alaska hawaii carib guam
+
+$(B EXAMPLES)
+    Radar within 50 miles of where you are
+
+        radar
+
+    Radar within 100 miles of a zip code
+
+        radar -r 100 60601
+
+    The latest image only
+
+        radar -l
+
+    The whole northeast
+
+        radar northeast
+
+EOF
+}
+
+# graphics_term: true when the terminal is kitty or ghostty
+graphics_term() {
+    [[ $TERM == xterm-kitty || $TERM == xterm-ghostty || $TERM_PROGRAM == ghostty || -n $KITTY_WINDOW_ID ]]
+}
+
+# station_for LAT LON: nearest NWS radar station id
+station_for() {
+    local s
+    s=$(curl -fsSL -A 'radar (github.com/amazebb/scripts)' "https://api.weather.gov/points/$1,$2" |
+        sed -n 's/.*"radarStation": *"\([A-Z0-9]*\)".*/\1/p')
+    [[ -n $s ]] || warn "No radar station for $1,$2 (US only)"
+    echo "$s"
+}
+
+# latlon LOCATION: print "lat lon" for a zip, "lat,lon" or the IP location
+latlon() {
+    local loc=$1 json lat lon
+    case $loc in
+        '')
+            loc=$(curl -fsS https://ipinfo.io/loc) || warn "Could not determine your location"
+            echo "${loc%%,*} ${loc##*,}"
+            ;;
+        [0-9][0-9][0-9][0-9][0-9])
+            json=$(curl -fsSL "https://api.zippopotam.us/us/$loc") || warn "Unknown zip code: $loc"
+            lat=$(sed -n 's/.*"latitude": *"\([^"]*\)".*/\1/p' <<<"$json")
+            lon=$(sed -n 's/.*"longitude": *"\([^"]*\)".*/\1/p' <<<"$json")
+            echo "$lat $lon"
+            ;;
+        [-0-9]*,[-0-9]*)
+            echo "${loc%%,*} ${loc##*,}"
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+# geometry LAT LON MILES: print "z x0 y0 cols rows cropx cropy size" for the 512px radar tiles
+# followed by the same fields for the 256px map tiles, which use the zoom that fills 720px
+geometry() {
+    awk -v lat="$1" -v lon="$2" -v mi="$3" 'function grid(z, t,    w, px, py, half) {
+        w = t * 2 ^ z
+        px = (lon + 180) / 360 * w
+        py = (1 - log(sin(r) / cos(r) + 1 / cos(r)) / pi) / 2 * w
+        half = mi * 1609.344 / (40075016.686 * cos(r) / w)
+        x0 = int((px - half) / t); y0 = int((py - half) / t)
+        printf "%d %d %d %d %d %d %d %d ", z, x0, y0, int((px + half) / t) - x0 + 1,
+            int((py + half) / t) - y0 + 1, px - half - x0 * t, py - half - y0 * t, 2 * half
+        return half
+    }
+    BEGIN {
+        pi = atan2(0, -1); r = lat * pi / 180
+        for (z = 7; z > 1; z--) {
+            if (mi * 1609.344 / (40075016.686 * cos(r) / (512 * 2 ^ z)) <= 512) break
+        }
+        grid(z, 512)
+        for (m = z + 1; m < 17; m++) {
+            if (2 * mi * 1609.344 / (40075016.686 * cos(r) / (256 * 2 ^ m)) >= 720) break
+        }
+        grid(m, 256)
+        print ""
+    }'
+}
+
+# stitch PREFIX COLS ROWS OUT: join PREFIX_0.png.. row by row into OUT
+stitch() {
+    ffmpeg -nostdin -loglevel error -y -start_number 0 -framerate 1 -i "$1_%d.png" \
+        -vf "tile=${2}x$3" -frames:v 1 "$4"
+}
+
+# rainviewer LAT LON MILES LATEST OUT: write a radar loop gif centred on LAT LON, one frame if LATEST is 1
+rainviewer() {
+    local lat=$1 lon=$2 mi=$3 latest=$4 out=$5 d z x0 y0 cols rows cx cy size host
+    local m mx0 my0 mcols mrows mcx mcy msize
+    local -a paths curl_args
+    local i j f k
+    command -v ffmpeg &>/dev/null || warn "ffmpeg not found. Install with: $(I brew install ffmpeg)"
+    d=$(dirname "$out")
+    read -r z x0 y0 cols rows cx cy size m mx0 my0 mcols mrows mcx mcy msize < <(geometry "$lat" "$lon" "$mi")
+
+    local json
+    json=$(curl -fsSL https://api.rainviewer.com/public/weather-maps.json) || warn "Could not reach RainViewer"
+    host=$(sed -n 's/.*"host": *"\([^"]*\)".*/\1/p' <<<"$json")
+    mapfile -t paths < <(grep -o '"path": *"/v2/radar/[a-z0-9]*"' <<<"$json" | sed 's/.*"\(\/v2[^"]*\)"/\1/')
+    ((${#paths[@]})) || warn "RainViewer returned no radar frames"
+    ((latest)) && paths=("${paths[-1]}")
+
+    for ((j = 0; j < rows; j++)); do
+        for ((i = 0; i < cols; i++)); do
+            k=$((j * cols + i))
+            for f in "${!paths[@]}"; do
+                curl_args+=(-o "$d/r${f}_$k.png" "$host${paths[f]}/512/$z/$((x0 + i))/$((y0 + j))/6/1_1.png")
+            done
+        done
+    done
+    for ((j = 0; j < mrows; j++)); do
+        for ((i = 0; i < mcols; i++)); do
+            curl_args+=(-o "$d/b_$((j * mcols + i)).png" "https://tile.openstreetmap.org/$m/$((mx0 + i))/$((my0 + j)).png")
+        done
+    done
+    info "Fetching ${#paths[@]} radar frames"
+    curl -fsSL -A "radar (github.com/amazebb/scripts)" --parallel --parallel-max 8 "${curl_args[@]}" || warn "Tile download failed"
+
+    stitch "$d/b" "$mcols" "$mrows" "$d/base.png"
+    for f in "${!paths[@]}"; do
+        stitch "$d/r${f}" "$cols" "$rows" "$d/R_$(printf %02d "$f").png"
+    done
+    ffmpeg -nostdin -loglevel error -y -loop 1 -framerate 4 -i "$d/base.png" -framerate 4 -i "$d/R_%02d.png" \
+        -filter_complex "[0]crop=$msize:$msize:$mcx:$mcy,scale=720:720:flags=lanczos[bg];[1]crop=$size:$size:$cx:$cy,scale=720:720:flags=lanczos[fg];[bg][fg]overlay=shortest=1,drawbox=x=iw/2-14:y=ih/2-4:w=28:h=8:color=black:t=fill,drawbox=x=iw/2-4:y=ih/2-14:w=8:h=28:color=black:t=fill,drawbox=x=iw/2-12:y=ih/2-2:w=24:h=4:color=white:t=fill,drawbox=x=iw/2-2:y=ih/2-12:w=4:h=24:color=white:t=fill,split[a][b];[a]palettegen[p];[b][p]paletteuse" \
+        -f gif "$out"
+}
+
+main() {
+    local mpv=0 nws=0 latest=0 fill=0 loc='' mi=50
+    while (($#)); do
+        case $1 in
+            -h) usage; exit 0 ;;
+            -m) mpv=1 ;;
+            -n) nws=1 ;;
+            -l) latest=1 ;;
+            -f) fill=1 ;;
+            -r) mi=$(argval "$@"); shift ;;
+            --) shift; break ;;
+            -*) warn "Unknown option: $1" ;;
+            *) break ;;
+        esac
+        shift
+    done
+    (($# <= 1)) || warn "Unexpected argument: $2"
+    loc=${1-}
+    [[ $mi =~ ^[0-9]+$ ]] || warn "Radius must be a number of miles"
+    ((mi >= 10 && mi <= 400)) || warn "Radius must be 10 to 400 miles"
+
+    command -v curl &>/dev/null || warn "curl not found"
+
+    local work gif ll name
+    work=$(mktemp -d "${TMPDIR:-/tmp}/radar.XXXXXX") || exit 1
+    trap 'rm -rf "$work"' EXIT
+    gif=$work/radar.gif
+    if ll=$(latlon "$loc"); then
+        if ((nws)); then
+            # shellcheck disable=SC2086
+            name=$(station_for $ll)
+        else
+            # shellcheck disable=SC2086
+            rainviewer $ll "$mi" "$latest" "$gif"
+        fi
+    else
+        name=$(tr "[:lower:]" "[:upper:]" <<<"$loc")
+    fi
+    if [[ -n $name ]]; then
+        info "Fetching ${name} radar"
+        curl -fsSL -o "$gif" "$BASE/${name}_$( ((latest)) && echo 0 || echo loop).gif" || warn "No radar loop named $name"
+    fi
+
+    local -a loop=(--loop) chafa_args=() icat_args=(--align left)
+    ((latest)) && loop=()
+    ((fill)) && loop+=(--fs)
+    if ((fill)); then
+        local cols rows
+        read -r rows cols < <(stty size 2>/dev/null)
+        cols=${cols:-80} rows=${rows:-24}
+        chafa_args=(--scale max --size "${cols}x$((rows - 1))")
+        icat_args=(--scale-up --place "${cols}x$((rows - 1))@0x0")
+        ((!mpv)) && graphics_term && printf '\e[H\e[2J'
+    fi
+    if ((!mpv)) && graphics_term && command -v chafa &>/dev/null; then
+        chafa -f kitty "${chafa_args[@]}" "$gif"
+    elif ((!mpv)) && graphics_term && command -v kitten &>/dev/null; then
+        kitten icat "${icat_args[@]}" "$gif"
+        read -r -n1 -s -p "Press any key to exit"
+        echo
+    else
+        command -v mpv &>/dev/null || warn "mpv not found. Install with: $(I brew install mpv)"
+        mpv --really-quiet "${loop[@]}" "$gif"
+    fi
+}
+
+main "$@"

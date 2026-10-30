@@ -17,6 +17,7 @@
 - [list-scripts](#list-scripts)
 - [n3](#n3)
 - [netmon](#netmon)
+- [radar](#radar)
 - [rawsync](#rawsync)
 - [shtoc](#shtoc)
 - [shtomd](#shtomd)
@@ -634,6 +635,67 @@
     <b>local.netmon</b>. Its plist and the instructions for installing,
     checking, stopping and removing it live in
     <i>~/.local/share/scripts/launchd/</i>.
+</pre>
+
+## [radar](https://github.com/amazebb/scripts/blob/master/bin/radar)
+
+<pre>
+<b>NAME</b>
+    <b>radar</b> - Show an animated weather radar loop around a US location
+
+<b>SYNOPSIS</b>
+    <b>radar [-h] [-m] [-n] [-l] [-f] [-r miles]</b> [<u>location</u>]
+
+<b>DESCRIPTION</b>
+    Builds a radar loop centred on <u>location</u> from RainViewer radar tiles over a
+    map, covering <b>-r</b> miles in every direction. With no <u>location</u> your IP address
+    is used. With <b>-n</b>, or for a radar station or region name, the fixed NWS loop from
+    radar.weather.gov is played instead (nearest station, about 140 miles) and
+    <b>-r</b> is ignored. Only the RainViewer loop needs ffmpeg.
+    Map data is from OpenStreetMap, radar from RainViewer.
+
+    In kitty or ghostty the gif is drawn directly in the terminal with <b>chafa</b>
+    (<i>Ctrl-C</i> to quit) or <b>kitten</b> if installed, otherwise it is played with mpv.
+
+<b>OPTIONS</b>
+    <b>-h</b>           Show this help message
+
+    <b>-m</b>           Play with mpv even when the terminal can show the gif itself
+
+    <b>-n</b>           Play the NWS loop of the nearest radar station
+
+    <b>-l</b>           Show only the latest radar image instead of the loop
+
+    <b>-f</b>           Scale the image up to fill the terminal height <i>(fullscreen with mpv)</i>
+
+    <b>-r</b> <u>miles</u>    Radius to show, about 10 to 400 <i>(default: 50)</i>
+
+    [<u>location</u>]    One of the following <i>(default: your IP location)</i>
+
+                  <i>10001</i>               zip code
+                  <i>40.71,-74.0</i>         latitude,longitude
+                  <i>KOKX</i>                NWS radar station, e.g. KOKX, KDIX, KLOT
+                  <i>northeast</i>           NWS region loop:
+                                      northeast southeast southmissvly southplains
+                                      northrockies uppermissvly centgrlakes conus
+                                      alaska hawaii carib guam
+
+<b>EXAMPLES</b>
+    Radar within 50 miles of where you are
+
+        radar
+
+    Radar within 100 miles of a zip code
+
+        radar -r 100 60601
+
+    The latest image only
+
+        radar -l
+
+    The whole northeast
+
+        radar northeast
 </pre>
 
 ## [rawsync](https://github.com/amazebb/scripts/blob/master/bin/rawsync)

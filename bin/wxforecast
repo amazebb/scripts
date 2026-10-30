@@ -20,8 +20,9 @@ $(B DESCRIPTION)
     hour under the axis. The chart shows as many hours as fit the terminal width.
     With $(B -r) it prints one raw line per hour instead, with the temperature, feels-like,
     dew point, humidity, cloud cover, chance of rain, expected rainfall, wind gust, wind and
-    conditions. Snowfall and visibility are chart-only metrics. With $(B -d) it prints the daily
-    forecast instead, one line per day with the high, low, chance of rain, wind and conditions.
+    conditions. Snowfall and visibility are chart-only metrics. With $(B -d) it shows the daily forecast
+    instead: a chart of the high and low with the chance of rain, or with $(B -r) one line per day
+    with the high, low, chance of rain, wind and conditions.
     With no $(U location) your IP address is used. US only.
 
 $(B OPTIONS)
@@ -30,7 +31,9 @@ $(B OPTIONS)
     $(B -A)           Do not show active weather alerts at the top. By default one line per
                   alert is printed first, from $(B wxalerts)
 
-    $(B -d)           Print the daily forecast, one line per day. $(B -r) and $(B -y) do not apply
+    $(B -d)           Print the daily forecast as a chart of the high and low temperature with
+                  the chance of rain on a right hand axis, or one line per day with $(B -r).
+                  $(B -y) does not apply
 
     $(B -r)           Print raw rows, one line per hour, instead of the chart
 
@@ -122,7 +125,8 @@ forecast_for() {
     awk -v hours="$3" -v metric="$4" -v graph="$5" -v metric2="$7" -v cols="$cols" -v si="$([[ $6 == si ]] && echo 1 || echo 0)" -f "$AWKDIR/wx-time.awk" -f "$AWKDIR/wx-emoji.awk" -f "$AWKDIR/wxforecast-hourly.awk" <(printf '%s\n' "$g") - <<<"$hourly"
 }
 
-# daily_for LAT LON DAYS UNITS: print one row per day from the NWS 12 hour forecast periods
+# daily_for LAT LON DAYS UNITS GRAPH: print the NWS 12 hour forecast periods as a high and low chart,
+# or one row per day when GRAPH is 0
 daily_for() {
     local pt url place daily
     pt=$(curl -fsSL -A "$UA" "https://api.weather.gov/points/$1,$2") || warn "No NWS forecast for $1,$2 (US only)"
@@ -130,7 +134,7 @@ daily_for() {
     place=$(place_of "$pt")
     daily=$(curl -fsSL -A "$UA" "$url") || warn "Could not fetch the daily forecast"
     info "${place:-$1,$2} daily forecast (NWS)$(stamps_of "$daily")"
-    awk -v ndays="$3" -v si="$([[ $4 == si ]] && echo 1 || echo 0)" -f "$AWKDIR/wx-time.awk" -f "$AWKDIR/wx-emoji.awk" -f "$AWKDIR/wxforecast-daily.awk" <<<"$daily"
+    awk -v ndays="$3" -v graph="$5" -v si="$([[ $4 == si ]] && echo 1 || echo 0)" -f "$AWKDIR/wx-time.awk" -f "$AWKDIR/wx-emoji.awk" -f "$AWKDIR/wxforecast-daily.awk" <<<"$daily"
 }
 
 main() {
@@ -189,7 +193,7 @@ main() {
     ((alerts)) && "$(dirname "$0")/wxalerts" -b "${ll// /,}" >&2
     if ((daily)); then
         # shellcheck disable=SC2086
-        daily_for $ll "$hours" "$units"
+        daily_for $ll "$hours" "$units" "$graph"
     else
         # shellcheck disable=SC2086
         forecast_for $ll "$hours" "$metric" "$graph" "$units" "$metric2"

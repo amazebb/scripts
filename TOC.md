@@ -881,8 +881,9 @@
     hour under the axis. The chart shows as many hours as fit the terminal width.
     With <b>-r</b> it prints one raw line per hour instead, with the temperature, feels-like,
     dew point, humidity, cloud cover, chance of rain, expected rainfall, wind gust, wind and
-    conditions. Snowfall and visibility are chart-only metrics. With <b>-d</b> it prints the daily
-    forecast instead, one line per day with the high, low, chance of rain, wind and conditions.
+    conditions. Snowfall and visibility are chart-only metrics. With <b>-d</b> it shows the daily forecast
+    instead: a chart of the high and low with the chance of rain, or with <b>-r</b> one line per day
+    with the high, low, chance of rain, wind and conditions.
     With no <u>location</u> your IP address is used. US only.
 
 <b>OPTIONS</b>
@@ -891,7 +892,9 @@
     <b>-A</b>           Do not show active weather alerts at the top. By default one line per
                   alert is printed first, from <b>wxalerts</b>
 
-    <b>-d</b>           Print the daily forecast, one line per day. <b>-r</b> and <b>-y</b> do not apply
+    <b>-d</b>           Print the daily forecast as a chart of the high and low temperature with
+                  the chance of rain on a right hand axis, or one line per day with <b>-r</b>.
+                  <b>-y</b> does not apply
 
     <b>-r</b>           Print raw rows, one line per hour, instead of the chart
 

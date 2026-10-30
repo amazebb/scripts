@@ -67,13 +67,13 @@ fc_stamps() {
   [[ $out == *"updated 30-Oct-2026 16:14, generated 30-Oct-2026 18:04"* ]]
 }
 
-# -d prints a row per day with high, low, rain and wind
+# -d -r prints a row per day with high, low, rain and wind
 fc_daily() {
   fc_shims
   local out
-  out=$("$BIN/wxforecast" -d 10001 2>&1 | sed 's/\x1b\[[0-9]*G/|/g')
+  out=$("$BIN/wxforecast" -d -r 10001 2>&1 | sed 's/\x1b\[[0-9]*G/|/g')
   [[ $out == *"daily forecast (NWS)"* && $out == *"|Fri 30-Oct   70°F  50°F   40%  5 to 10 mph NW   Sunny"* ]] || return 1
-  out=$("$BIN/wxforecast" -d -u si 10001 2>&1)
+  out=$("$BIN/wxforecast" -d -r -u si 10001 2>&1)
   [[ $out == *"21°C"*"10°C"*"8 to 16 km/h NW"* ]] &&
     ! "$BIN/wxforecast" -d -n 8 10001 >/dev/null 2>&1
 }
@@ -88,6 +88,15 @@ fc_alert_banner() {
   out=$("$BIN/wxforecast" -r 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
   [[ ${out%%$'\n'*} == "⚠ Flood Watch (Severe)"* ]] || return 1
   [[ $("$BIN/wxforecast" -A -r 10001 2>&1 | head -1) != *"Flood Watch"* ]]
+}
+
+# -d draws the high and low temperature with the chance of rain on a right axis
+fc_daily_chart() {
+  fc_shims
+  local out
+  out=$("$BIN/wxforecast" -d 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g; s/\x1b\[[0-9]*G/|/g')
+  [[ $out == *"▲ High  ▼ Low (°F)   ◆ Chance of rain (%)"* && $out == *"70 │"*"▲"* && $out == *"50 │"*"▼"* ]] || return 1
+  [[ $out == *"|Fri"* && $out == *"|30-Oct"* && $out == *"│ 100"* && $out == *"◆"* ]]
 }
 
 # -u si converts to C, km/h and mm
@@ -152,7 +161,8 @@ t "wxforecast: rejects bad hours" fc_bad_hours
 t "wxforecast: default temp and qpf" fc_default_metrics
 t "wxforecast: default chart" fc_graph
 t "wxforecast: status line shows update times" fc_stamps
-t "wxforecast: -d daily rows" fc_daily
+t "wxforecast: -d -r daily rows" fc_daily
+t "wxforecast: -d daily chart" fc_daily_chart
 t "wxforecast: alert banner and -A" fc_alert_banner
 t "wxforecast: -u si" fc_si
 t "wxforecast: -y hum and dew" fc_hum_dew

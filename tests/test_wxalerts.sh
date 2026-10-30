@@ -17,6 +17,7 @@ alert_json() {
                         "XXZ001"
                     ]
                 },
+                "onset": "2026-10-30T10:00:00-04:00",
                 "ends": "2026-10-30T20:00:00-04:00",
                 "expires": "2026-10-30T19:00:00-04:00",
                 "severity": "$sev",
@@ -46,12 +47,12 @@ esac'
   rm -f "$TMP/noalerts"
 }
 
-# the most severe alert comes first, with severity and end time
+# the most severe alert comes first, with severity, start and end time
 wa_order() {
   wa_shims
   local out
   out=$(TZ=UTC "$BIN/wxalerts" 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
-  [[ $out == "⚠ Flood Watch (Severe) until 31-Oct-2026 00:00"* && $out == *"⚠ Heat Advisory (Moderate)"* &&
+  [[ $out == "⚠ Flood Watch (Severe) from 30-Oct-2026 14:00 until 31-Oct-2026 00:00"* && $out == *"⚠ Heat Advisory (Moderate)"* &&
     $out == *"Flood Watch issued for Test County"* && $out == *"Area: Test County"* ]] &&
     [[ $out != *"FLOOD DESC"* ]]
 }

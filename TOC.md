@@ -836,7 +836,7 @@
 
 <b>DESCRIPTION</b>
     Lists the watches, warnings and advisories the National Weather Service has in
-    effect for the point, most severe first, each with its severity, when it ends,
+    effect for the point, most severe first, each with its severity, when it starts and ends,
     the headline and the affected area. Prints nothing special when there are none.
     With no <u>location</u> your IP address is used. US only.
 

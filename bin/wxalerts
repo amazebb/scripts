@@ -15,7 +15,7 @@ $(B SYNOPSIS)
 
 $(B DESCRIPTION)
     Lists the watches, warnings and advisories the National Weather Service has in
-    effect for the point, most severe first, each with its severity, when it ends,
+    effect for the point, most severe first, each with its severity, when it starts and ends,
     the headline and the affected area. Prints nothing special when there are none.
     With no $(U location) your IP address is used. US only.
 
@@ -48,7 +48,7 @@ EOF
 }
 
 # alert_rows JSON: print one tab separated row per alert, most severe first:
-# severity, event, ends, headline, area, description, instructions. Newlines in the text become \x1f.
+# severity, event, start, end, headline, area, description, instructions. Newlines in the text become \x1f.
 alert_rows() {
     awk '
         function val(l) {
@@ -59,6 +59,8 @@ alert_rows() {
         /^                "areaDesc"/ { n++; area[n] = val($0) }
         n && /^                "severity"/ { sev[n] = val($0) }
         n && /^                "event"/ { event[n] = val($0) }
+        n && /^                "effective"/ { effective[n] = val($0) }
+        n && /^                "onset"/ { onset[n] = val($0) }
         n && /^                "expires"/ { expires[n] = val($0) }
         n && /^                "ends"/ { ends[n] = val($0) }
         n && /^                "headline"/ { head[n] = val($0) }
@@ -69,7 +71,7 @@ alert_rows() {
             for (o = 1; o <= 5; o++)
                 for (i = 1; i <= n; i++)
                     if ((o < 5 && sev[i] == order[o]) || (o == 5 && sev[i] != "Extreme" && sev[i] != "Severe" && sev[i] != "Moderate" && sev[i] != "Minor"))
-                        printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", sev[i], event[i], (ends[i] != "" && ends[i] != "null") ? ends[i] : expires[i], head[i], area[i], desc[i], instr[i]
+                        printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", sev[i], event[i], (onset[i] != "" && onset[i] != "null") ? onset[i] : effective[i], (ends[i] != "" && ends[i] != "null") ? ends[i] : expires[i], head[i], area[i], desc[i], instr[i]
         }' <<<"$1"
 }
 
@@ -83,7 +85,7 @@ sev_color() {
 }
 
 main() {
-    local brief=0 long=0 loc ll json rows sev event ts head area desc instr until n=0 c
+    local brief=0 long=0 loc ll json rows sev event from ts head area desc instr when n=0 c
     while (($#)); do
         case $1 in
             -h) usage; exit 0 ;;
@@ -112,16 +114,17 @@ main() {
         exit 0
     fi
 
-    while IFS=$'\t' read -r sev event ts head area desc instr; do
+    while IFS=$'\t' read -r sev event from ts head area desc instr; do
         c=$(sev_color "$sev")
-        until=''
-        [[ -n $ts ]] && until=" until $(stamp_fmt "$(iso_epoch "$ts")")"
+        when=''
+        [[ -n $from ]] && when=" from $(stamp_fmt "$(iso_epoch "$from")")"
+        [[ -n $ts ]] && when+=" until $(stamp_fmt "$(iso_epoch "$ts")")"
         if ((brief)); then
-            printf '\e[%sm⚠ %s (%s)%s\e[0m\n' "$c" "$event" "$sev" "$until"
+            printf '\e[%sm⚠ %s (%s)%s\e[0m\n' "$c" "$event" "$sev" "$when"
             continue
         fi
         ((n++)) && echo
-        printf '\e[1;%sm⚠ %s\e[0m \e[%sm(%s)%s\e[0m\n' "$c" "$event" "$c" "$sev" "$until"
+        printf '\e[1;%sm⚠ %s\e[0m \e[%sm(%s)%s\e[0m\n' "$c" "$event" "$c" "$sev" "$when"
         [[ -n $head ]] && echo "  $head"
         [[ -n $area ]] && echo "  Area: $area"
         if ((long)); then

@@ -12,7 +12,7 @@ $(B NAME)
     $(B radar) - Show an animated weather radar loop around a US location
 
 $(B SYNOPSIS)
-    $(B "radar [-h] [-m] [-n] [-l] [-f] [-r miles]") [$(U location)]
+    $(B "radar [-h] [-m] [-n] [-l] [-f] [-t] [-r miles]") [$(U location)]
 
 $(B DESCRIPTION)
     Builds a radar loop centred on $(U location) from RainViewer radar tiles over a
@@ -36,6 +36,9 @@ $(B OPTIONS)
 
     $(B -f)           Scale the image up to fill the terminal height $(I '(fullscreen with mpv)')
 
+    $(B -t)           Print the next 24 hours of forecast as text above the radar, from the
+                  NWS hourly forecast (free, no key). Needs a zip or latitude,longitude
+
     $(B -r) $(U miles)    Radius to show, about 10 to 400 $(I '(default: 50)')
 
     [$(U location)]    One of the following $(I '(default: your IP location)')
@@ -56,6 +59,10 @@ $(B EXAMPLES)
     Radar within 100 miles of a zip code
 
         radar -r 100 60601
+
+    The next 24 hours of weather as text above the radar
+
+        radar -t 60601
 
     The latest image only
 
@@ -80,6 +87,31 @@ station_for() {
         sed -n 's/.*"radarStation": *"\([A-Z0-9]*\)".*/\1/p')
     [[ -n $s ]] || warn "No radar station for $1,$2 (US only)"
     echo "$s"
+}
+
+# forecast LAT LON: print the next 24 hours from the NWS hourly forecast
+forecast() {
+    local ua='radar (github.com/amazebb/scripts)' pt url place
+    pt=$(curl -fsSL -A "$ua" "https://api.weather.gov/points/$1,$2") || warn "No NWS forecast for $1,$2 (US only)"
+    url=$(sed -n 's/.*"forecastHourly": *"\(.*\)".*/\1/p' <<<"$pt")
+    place=$(awk -F'"' '/"city": "[A-Z]/ { c = $4 } /"state": "[A-Z]/ { print c ", " $4; exit }' <<<"$pt")
+    info "${place:-$1,$2} hourly forecast (NWS)"
+    curl -fsSL -A "$ua" "$url" | awk '
+        BEGIN {
+            split("Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec", mon, " ")
+            printf "%-12s %5s %5s  %-10s %s\n", "TIME", "TEMP", "RAIN", "WIND", "SKY"
+        }
+        function val(l) { gsub(/^[^:]*: *"?|"?,? *$/, "", l); return l }
+        /"startTime"/ { t = val($0); d = substr(t, 9, 2) "-" mon[substr(t, 6, 2) + 0] " " substr(t, 12, 5) }
+        /"temperature"/ { temp = val($0) }
+        /"probabilityOfPrecipitation"/ { sec = "rain" }
+        /"dewpoint"|"relativeHumidity"/ { sec = "" }
+        /"value"/ && sec == "rain" { rain = val($0); sec = "" }
+        /"windSpeed"/ { wind = val($0) }
+        /"windDirection"/ { wind = wind " " val($0) }
+        /"shortForecast"/ {
+            if (++n <= 24) printf "%-12s %4s° %4s%%  %-10s %s\n", d, temp, rain == "null" ? 0 : rain, wind, val($0)
+        }'
 }
 
 # latlon LOCATION: print "lat lon" for a zip, "lat,lon" or the IP location
@@ -196,7 +228,7 @@ rainviewer() {
 }
 
 main() {
-    local mpv=0 nws=0 latest=0 fill=0 loc='' mi=50
+    local mpv=0 nws=0 latest=0 fill=0 text=0 loc='' mi=50
     while (($#)); do
         case $1 in
             -h) usage; exit 0 ;;
@@ -204,6 +236,7 @@ main() {
             -n) nws=1 ;;
             -l) latest=1 ;;
             -f) fill=1 ;;
+            -t) text=1 ;;
             -r) mi=$(argval "$@"); shift ;;
             --) shift; break ;;
             -*) warn "Unknown option: $1" ;;
@@ -219,6 +252,11 @@ main() {
     command -v curl &>/dev/null || warn "curl not found"
 
     local work gif ll name
+    if ((text)); then
+        ll=$(latlon "$loc") || warn "Forecast needs a zip code or latitude,longitude"
+        # shellcheck disable=SC2086
+        forecast $ll
+    fi
     work=$(mktemp -d "${TMPDIR:-/tmp}/radar.XXXXXX") || exit 1
     trap 'rm -rf "$work"' EXIT
     gif=$work/radar.gif
@@ -247,7 +285,7 @@ main() {
         cols=${cols:-80} rows=${rows:-24}
         chafa_args=(--scale max --size "${cols}x$((rows - 1))")
         icat_args=(--scale-up --place "${cols}x$((rows - 1))@0x0")
-        ((!mpv)) && graphics_term && printf '\e[H\e[2J'
+        ((!mpv && !text)) && graphics_term && printf '\e[H\e[2J'
     fi
     if ((!mpv)) && graphics_term && command -v chafa &>/dev/null; then
         chafa -f kitty "${chafa_args[@]}" "$gif"

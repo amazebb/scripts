@@ -7,7 +7,8 @@ radar_shims() {
   shim curl 'echo "$@" >>"$TMP/urls"
 case "$*" in
   *weather-maps.json*) echo "{\"host\":\"https://tiles.test\",\"radar\":{\"past\":[{\"time\":1,\"path\":\"/v2/radar/abc\"},{\"time\":2,\"path\":\"/v2/radar/def\"}]}}" ;;
-  *api.weather.gov*) echo "\"radarStation\": \"KABC\"" ;;
+  *gridpoints*) printf "{\n\"startTime\": \"2026-10-30T13:00:00-04:00\",\n\"temperature\": 70,\n\"probabilityOfPrecipitation\": {\n\"value\": 40\n},\n\"windSpeed\": \"13 mph\",\n\"windDirection\": \"NW\",\n\"shortForecast\": \"Sunny\",\n}\n" ;;
+  *api.weather.gov*) echo "\"radarStation\": \"KABC\", \"forecastHourly\": \"https://api.weather.gov/gridpoints/X/1,1/forecast/hourly\"" ;;
   *zippopotam*) echo "{\"places\":[{\"longitude\": \"-73.9967\", \"latitude\": \"40.7484\"}]}" ;;
   *ipinfo*) echo "40.7484,-73.9967" ;;
   *radar.weather.gov*) printf GIF >"$3" ;;
@@ -80,6 +81,21 @@ radar_fill() {
   grep -q -- '--scale max' "$TMP/chafa"
 }
 
+# -t prints the hourly forecast before the radar status line
+radar_forecast() {
+  radar_shims
+  local out
+  out=$("$BIN/radar" -t 10001 2>&1)
+  [[ $out == *"30-Oct 13:00   70°   40%  13 mph NW  Sunny"* ]] &&
+    [[ ${out%%RainViewer*} == *"hourly forecast"* ]]
+}
+
+# -t needs coordinates, not a station name
+radar_forecast_needs_coords() {
+  radar_shims
+  ! "$BIN/radar" -t KOKX >/dev/null 2>&1
+}
+
 # a region name plays the NWS loop, upper-cased
 radar_region() {
   radar_shims
@@ -127,6 +143,8 @@ t "radar: rejects bad radius" radar_bad_radius
 t "radar: -n uses the nearest NWS station" radar_nws
 t "radar: -l shows the latest only" radar_latest
 t "radar: -f fills the terminal" radar_fill
+t "radar: -t prints the forecast above the radar" radar_forecast
+t "radar: -t rejects a station name" radar_forecast_needs_coords
 t "radar: region name" radar_region
 t "radar: mpv fallback" radar_mpv_fallback
 t "radar: ghostty uses chafa" radar_chafa

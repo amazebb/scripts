@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Location helpers shared by wxradar and wxforecast
+# Location and time helpers shared by wxradar and wxforecast
 
 # shellcheck disable=SC2034
 UA='wx (github.com/amazebb/scripts)'
@@ -23,4 +23,16 @@ latlon() {
             ;;
         *) return 1 ;;
     esac
+}
+
+# stamp_fmt [EPOCH]: DD-MMM-YYYY HH:MM local time, now by default
+stamp_fmt() {
+    local f='+%d-%b-%Y %H:%M'
+    if [[ -z $1 ]]; then date "$f"; else date -d "@$1" "$f" 2>/dev/null || date -r "$1" "$f"; fi
+}
+
+# iso_epoch TS: epoch seconds of an ISO 8601 UTC timestamp like 2026-10-30T18:04:24+00:00
+iso_epoch() {
+    local ts=${1%+00:00}Z
+    date -d "$ts" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$ts" +%s
 }

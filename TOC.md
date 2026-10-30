@@ -836,16 +836,24 @@
     Draws a chart of the National Weather Service hourly forecast (free, no key), with
     time along the x axis, the y metric as a dot per hour and a weather emoji for each
     hour under the axis. The chart shows as many hours as fit the terminal width.
-    With <b>-r</b> it prints one raw line per hour instead, with the temperature, chance of
-    dew point, humidity, chance of rain, expected rainfall, wind and conditions. With no <u>location</u> your IP address is used. US only.
+    With <b>-r</b> it prints one raw line per hour instead, with the temperature, feels-like,
+    dew point, humidity, cloud cover, chance of rain, expected rainfall, wind gust, wind and
+    conditions. Snowfall and visibility are chart-only metrics. With no <u>location</u> your IP
+    address is used. US only.
 
 <b>OPTIONS</b>
     <b>-h</b>           Show this help message
 
     <b>-r</b>           Print raw rows, one line per hour, instead of the chart
 
-    <b>-y</b> <u>metric</u>   Value for the chart y axis: <i>temp</i>, <i>dew</i> point, <i>hum</i> idity,
-                  <i>rain</i> chance, <i>qpf</i> expected rainfall or <i>wind</i> <i>(default: temp)</i>
+    <b>-y</b> <u>metric</u>   Value for the chart y axis <i>(default: temp)</i>
+
+                  <i>temp</i>    temperature          <i>rain</i>   chance of rain
+                  <i>feels</i>   feels-like           <i>qpf</i>    expected rainfall
+                  <i>dew</i>     dew point            <i>snow</i>   expected snowfall
+                  <i>hum</i>     relative humidity    <i>wind</i>   wind speed
+                  <i>cloud</i>   cloud cover          <i>gust</i>   wind gust
+                                                <i>vis</i>    visibility
 
     <b>-u</b> <u>units</u>    <i>imperial</i> (°F, mph, in) or <i>si</i> (°C, km/h, mm) <i>(default: imperial)</i>
 

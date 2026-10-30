@@ -17,16 +17,24 @@ $(B DESCRIPTION)
     Draws a chart of the National Weather Service hourly forecast (free, no key), with
     time along the x axis, the y metric as a dot per hour and a weather emoji for each
     hour under the axis. The chart shows as many hours as fit the terminal width.
-    With $(B -r) it prints one raw line per hour instead, with the temperature, chance of
-    dew point, humidity, chance of rain, expected rainfall, wind and conditions. With no $(U location) your IP address is used. US only.
+    With $(B -r) it prints one raw line per hour instead, with the temperature, feels-like,
+    dew point, humidity, cloud cover, chance of rain, expected rainfall, wind gust, wind and
+    conditions. Snowfall and visibility are chart-only metrics. With no $(U location) your IP
+    address is used. US only.
 
 $(B OPTIONS)
     $(B -h)           Show this help message
 
     $(B -r)           Print raw rows, one line per hour, instead of the chart
 
-    $(B -y) $(U metric)   Value for the chart y axis: $(I temp), $(I dew) point, $(I hum) idity,
-                  $(I rain) chance, $(I qpf) expected rainfall or $(I wind) $(I '(default: temp)')
+    $(B -y) $(U metric)   Value for the chart y axis $(I '(default: temp)')
+
+                  $(I temp)    temperature          $(I rain)   chance of rain
+                  $(I feels)   feels-like           $(I qpf)    expected rainfall
+                  $(I dew)     dew point            $(I snow)   expected snowfall
+                  $(I hum)     relative humidity    $(I wind)   wind speed
+                  $(I cloud)   cloud cover          $(I gust)   wind gust
+                                                $(I vis)    visibility
 
     $(B -u) $(U units)    $(I imperial) (°F, mph, in) or $(I si) (°C, km/h, mm) $(I '(default: imperial)')
 
@@ -70,12 +78,18 @@ function epochh(ts,    sign) {
     return days(substr(ts, 1, 4) + 0, substr(ts, 6, 2) + 0, substr(ts, 9, 2) + 0) * 24 + substr(ts, 12, 2) - sign * substr(ts, 21, 2)
 }'
 
-# qpf_hours: read NWS grid data json, print "UTC-hour mm" for every hour of a block, the block total
-# (mm over its validTime period) divided evenly by its hours
-qpf_hours() {
+# grid_hours: read NWS grid data json, print "name UTC-hour value" for every hour of each block, in SI units.
+# Rainfall and snow are block totals (mm over the validTime period), spread evenly over its hours;
+# the rest are instantaneous values repeated over the block.
+grid_hours() {
     awk "$AWK_TIME"'
-        /^        "[A-Za-z]+": *\{/ { inq = /quantitativePrecipitation/ }
-        inq && /"validTime"/ {
+        BEGIN {
+            f["quantitativePrecipitation"] = "qpf"; f["snowfallAmount"] = "snow"; f["windGust"] = "gust"
+            f["skyCover"] = "cloud"; f["apparentTemperature"] = "feels"; f["visibility"] = "vis"
+            total["qpf"] = total["snow"] = 1
+        }
+        /^        "[A-Za-z]+": *\{/ { split($1, kk, "\""); name = (kk[2] in f) ? f[kk[2]] : "" }
+        name != "" && /"validTime"/ {
             split($0, a, "\"")
             split(a[4], v, "/")
             h = 0
@@ -83,9 +97,9 @@ qpf_hours() {
             if (match(v[2], /[0-9]+H/)) h += substr(v[2], RSTART, RLENGTH - 1)
             start = epochh(v[1])
         }
-        inq && /"value"/ && h > 0 {
-            x = $0; gsub(/[^0-9.]/, "", x)
-            for (k = 0; k < h; k++) printf "%d %.4f\n", start + k, x / h
+        name != "" && /"value"/ && h > 0 {
+            x = $0; gsub(/[^0-9.-]/, "", x)
+            for (k = 0; k < h; k++) printf "%s %d %.4f\n", name, start + k, total[name] ? x / h : x
             h = 0
         }'
 }
@@ -93,16 +107,21 @@ qpf_hours() {
 # forecast_for LAT LON HOURS METRIC GRAPH UNITS: print HOURS of the NWS hourly forecast as a METRIC chart,
 # or as raw rows when GRAPH is 0
 forecast_for() {
-    local pt url grid place cols qpf
+    local pt url grid place cols g hourly stamps='' k t
     pt=$(curl -fsSL -A "$UA" "https://api.weather.gov/points/$1,$2") || warn "No NWS forecast for $1,$2 (US only)"
     url=$(sed -n 's/.*"forecastHourly": *"\(.*\)".*/\1/p' <<<"$pt")
     grid=$(sed -n 's/.*"forecastGridData": *"\(.*\)".*/\1/p' <<<"$pt")
-    qpf=$(curl -fsSL -A "$UA" "$grid" | qpf_hours) || info "No rainfall amounts available"
+    g=$(curl -fsSL -A "$UA" "$grid" | grid_hours) || info "No grid data (rainfall, gusts, cloud cover) available"
     place=$(awk -F'"' '/"city": "[A-Z]/ { c = $4 } /"state": "[A-Z]/ { print c ", " $4; exit }' <<<"$pt")
     cols=$(tput cols 2>/dev/null || echo 80)
-    info "${place:-$1,$2} hourly forecast (NWS)"
-    curl -fsSL -A "$UA" "$url" | awk -v hours="$3" -v metric="$4" -v graph="$5" -v cols="$cols" -v si="$([[ $6 == si ]] && echo 1 || echo 0)" "$AWK_TIME"'
-        FNR == NR { q[$1] = $2; next }
+    hourly=$(curl -fsSL -A "$UA" "$url") || warn "Could not fetch the hourly forecast"
+    for k in updateTime:updated generatedAt:generated; do
+        t=$(sed -n "s/.*\"${k%:*}\": *\"\([^\"]*\)\".*/\1/p" <<<"$hourly" | head -1)
+        [[ -n $t ]] && stamps+=", ${k#*:} $(stamp_fmt "$(iso_epoch "$t")")"
+    done
+    info "${place:-$1,$2} hourly forecast (NWS)$stamps"
+    awk -v hours="$3" -v metric="$4" -v graph="$5" -v cols="$cols" -v si="$([[ $6 == si ]] && echo 1 || echo 0)" "$AWK_TIME"'
+        FNR == NR { q[$1, $2] = $3; next }
         function val(l) { gsub(/^[^:]*: *"?|"?,? *$/, "", l); return l }
         function emoji(f, day) {
             f = tolower(f)
@@ -115,7 +134,32 @@ forecast_for() {
             if (f ~ /mostly (clear|sunny)/) return day ? "🌤️" : "🌙"
             return day ? "☀️" : "🌙"
         }
-        /"startTime"/ { t = val($0); n++; amt[n] = (epochh(t) in q) ? q[epochh(t)] : 0; if (!si) amt[n] /= 25.4; hh[n] = substr(t, 12, 2); dd[n] = substr(t, 9, 2) "-" mon(substr(t, 6, 2)); tm[n] = substr(t, 12, 5) }
+        function mon(m) { return substr("JanFebMarAprMayJunJulAugSepOctNovDec", (m - 1) * 3 + 1, 3) }
+        function grid(name, e) { return ((name, e) in q) ? q[name, e] : 0 }
+        function cdeg(c) { return si ? c : c * 9 / 5 + 32 }
+        function mv(m, i) {
+            if (m == "feels") return feels[i]
+            if (m == "dew") return dew[i]
+            if (m == "hum") return hum[i]
+            if (m == "cloud") return cloud[i]
+            if (m == "rain") return rain[i]
+            if (m == "qpf") return amt[i]
+            if (m == "snow") return snow[i]
+            if (m == "wind") return wind[i]
+            if (m == "gust") return gust[i]
+            if (m == "vis") return vis[i]
+            return temp[i]
+        }
+        /"startTime"/ {
+            t = val($0); n++; e = epochh(t)
+            amt[n] = grid("qpf", e) / (si ? 1 : 25.4)
+            snow[n] = grid("snow", e) / (si ? 1 : 25.4)
+            gust[n] = grid("gust", e) / (si ? 1 : 1.609344)
+            cloud[n] = grid("cloud", e)
+            feels[n] = cdeg(grid("feels", e))
+            vis[n] = grid("vis", e) / (si ? 1000 : 1609.344)
+            hh[n] = substr(t, 12, 2); dd[n] = substr(t, 9, 2) "-" mon(substr(t, 6, 2)); tm[n] = substr(t, 12, 5)
+        }
         /"isDaytime"/ { day = val($0) == "true" }
         /"temperature"/ { temp[n] = si ? (val($0) - 32) * 5 / 9 : val($0) }
         /"probabilityOfPrecipitation"/ { sec = "rain" }
@@ -125,37 +169,47 @@ forecast_for() {
             v = val($0); if (v == "null") v = 0
             if (sec == "rain") rain[n] = v
             else if (sec == "hum") hum[n] = v
-            else dew[n] = si ? v : v * 9 / 5 + 32
+            else dew[n] = cdeg(v)
             sec = ""
         }
         /"windSpeed"/ { wind[n] = val($0) * (si ? 1.609344 : 1); ws[n] = sprintf("%.0f %s", wind[n], si ? "km/h" : "mph") }
         /"windDirection"/ { wd[n] = val($0) }
         /"shortForecast"/ { sky[n] = val($0); em[n] = emoji(val($0), day) }
-        function mon(m) { return substr("JanFebMarAprMayJunJulAugSepOctNovDec", (m - 1) * 3 + 1, 3) }
         END {
+            u = si ? "C" : "F"
             if (!graph) {
-                printf "%-12s %5s %5s %4s %4s %8s  %-11s %s\n", "TIME", "TEMP", "DEW", "HUM", "RAIN", si ? "AMT(mm)" : "AMT(in)", "WIND", "SKY"
+                printf "%-12s %5s %5s %5s %4s %4s %4s %8s %4s  %-11s %s\n", "TIME", "TEMP", "FEEL", "DEW", "HUM", "CLD", "RAIN", si ? "AMT(mm)" : "AMT(in)", "GUST", "WIND", "SKY"
                 for (i = 1; i <= n && i <= hours; i++)
-                    printf "%-12s %3.0f°%s %3.0f°%s %3s%% %3s%% %8s  %-11s %s\n", dd[i] " " tm[i], temp[i], si ? "C" : "F", dew[i], si ? "C" : "F", hum[i], rain[i], sprintf(si ? "%.1f" : "%.2f", amt[i]), ws[i] " " wd[i], sky[i]
+                    printf "%-12s %3.0f°%s %3.0f°%s %3.0f°%s %3s%% %3.0f%% %3s%% %8s %4.0f  %-11s %s\n", dd[i] " " tm[i], temp[i], u, feels[i], u, dew[i], u, hum[i], cloud[i], rain[i], sprintf(si ? "%.1f" : "%.2f", amt[i]), gust[i], ws[i] " " wd[i], sky[i]
                 exit
             }
             w = int((cols - 6) / 3); if (w < 1) w = 1
             m = hours < w ? hours : w; if (m > n) m = n
-            for (i = 1; i <= m; i++) y[i] = metric == "rain" ? rain[i] : metric == "hum" ? hum[i] : metric == "dew" ? dew[i] : metric == "qpf" ? amt[i] : metric == "wind" ? wind[i] : temp[i]
+            for (i = 1; i <= m; i++) y[i] = mv(metric, i)
             lo = hi = y[1]
             for (i = 1; i <= m; i++) { if (y[i] < lo) lo = y[i]; if (y[i] > hi) hi = y[i] }
-            if (metric == "rain" || metric == "hum") { lo = 0; hi = 100 }
-            if (metric == "qpf") { lo = 0; if (hi < (si ? 2 : 0.1)) hi = si ? 2 : 0.1 }
+            frac = metric == "qpf" || metric == "snow" || metric == "vis"
+            if (metric == "rain" || metric == "hum" || metric == "cloud") { lo = 0; hi = 100 }
+            if (frac) { lo = 0; min = metric == "qpf" ? (si ? 2 : 0.1) : metric == "snow" ? (si ? 25 : 1) : (si ? 10 : 6); if (hi < min) hi = min }
             h = 10
-            if (metric != "qpf" && hi - lo < h - 1) hi = lo + h - 1
-            unit = metric == "rain" || metric == "hum" ? "%" : metric == "qpf" ? (si ? "mm/hr" : "in/hr") : metric == "wind" ? (si ? "km/h" : "mph") : (si ? "°C" : "°F")
-            title = metric == "rain" ? "Chance of rain" : metric == "hum" ? "Relative humidity" : metric == "dew" ? "Dew point" : metric == "qpf" ? "Expected rainfall" : metric == "wind" ? "Wind speed" : "Temperature"
+            if (!frac && hi - lo < h - 1) hi = lo + h - 1
+            if (metric == "rain") { title = "Chance of rain"; unit = "%" }
+            else if (metric == "hum") { title = "Relative humidity"; unit = "%" }
+            else if (metric == "cloud") { title = "Cloud cover"; unit = "%" }
+            else if (metric == "dew") { title = "Dew point"; unit = "°" u }
+            else if (metric == "feels") { title = "Feels like"; unit = "°" u }
+            else if (metric == "qpf") { title = "Expected rainfall"; unit = si ? "mm/hr" : "in/hr" }
+            else if (metric == "snow") { title = "Expected snowfall"; unit = si ? "mm/hr" : "in/hr" }
+            else if (metric == "wind") { title = "Wind speed"; unit = si ? "km/h" : "mph" }
+            else if (metric == "gust") { title = "Wind gust"; unit = si ? "km/h" : "mph" }
+            else if (metric == "vis") { title = "Visibility"; unit = si ? "km" : "mi" }
+            else { title = "Temperature"; unit = "°" u }
             printf "%s (%s)\n", title, unit
             for (r = h - 1; r >= 0; r--) {
                 line = ""
                 for (i = 1; i <= m; i++) line = line ((int((y[i] - lo) / (hi - lo) * (h - 1) + 0.5) == r) ? " ● " : "   ")
                 yv = lo + (hi - lo) * r / (h - 1)
-                printf "%4s │%s\n", metric == "qpf" ? sprintf(si ? "%.1f" : "%.2f", yv) : sprintf("%d", yv + 0.5), line
+                printf "%4s │%s\n", metric == "qpf" ? sprintf(si ? "%.1f" : "%.2f", yv) : frac ? sprintf("%.1f", yv) : sprintf("%d", yv + 0.5), line
             }
             axis = ""
             for (i = 1; i <= m; i++) axis = axis "───"
@@ -167,7 +221,7 @@ forecast_for() {
             printf "\n"
             for (i = 1; i <= m; i++) if (i == 1 || hh[i] == "00") printf "\033[%dG%s", 7 + (i - 1) * 3 + 1, dd[i]
             printf "\n"
-        }' <(printf '%s\n' "$qpf") -
+        }' <(printf '%s\n' "$g") - <<<"$hourly"
 }
 
 main() {
@@ -190,7 +244,7 @@ main() {
     [[ $hours =~ ^[0-9]+$ ]] || warn "Hours must be a number"
     ((hours >= 1 && hours <= 156)) || warn "Hours must be 1 to 156"
     [[ $units == @(imperial|si) ]] || warn "Units must be imperial or si"
-    [[ $metric == @(temp|dew|hum|rain|qpf|wind) ]] || warn "Metric must be temp, dew, hum, rain, qpf or wind"
+    [[ $metric == @(temp|feels|dew|hum|cloud|rain|qpf|snow|wind|gust|vis) ]] || warn "Metric must be temp, feels, dew, hum, cloud, rain, qpf, snow, wind, gust or vis"
 
     command -v curl &>/dev/null || warn "curl not found"
     ll=$(latlon "$loc") || warn "Forecast needs a zip code or latitude,longitude"

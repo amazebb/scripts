@@ -124,12 +124,6 @@ stitch() {
         -vf "tile=${2}x$3" -frames:v 1 "$4"
 }
 
-# stamp_fmt [EPOCH]: DD-MMM-YYYY HH:MM local time, now by default
-stamp_fmt() {
-    local f='+%d-%b-%Y %H:%M'
-    if [[ -z $1 ]]; then date "$f"; else date -d "@$1" "$f" 2>/dev/null || date -r "$1" "$f"; fi
-}
-
 # rainviewer LAT LON MILES LATEST OUT LABEL: write a radar loop gif centred on LAT LON, one frame if LATEST is 1
 rainviewer() {
     local lat=$1 lon=$2 mi=$3 latest=$4 out=$5 label=$6 d z x0 y0 cols rows cx cy size host

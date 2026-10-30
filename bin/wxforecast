@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Print the NWS hourly weather forecast for a US location as text
+# Print the NWS hourly or daily weather forecast for a US location
 
 # shellcheck disable=SC2016
 source "$(dirname "$0")/common.sh"
@@ -8,10 +8,10 @@ source "$(dirname "$0")/wxgeo.sh"
 usage() {
     cat <<EOF
 $(B NAME)
-    $(B wxforecast) - Print the hourly weather forecast for a US location
+    $(B wxforecast) - Print the hourly or daily weather forecast for a US location
 
 $(B SYNOPSIS)
-    $(B "wxforecast [-h] [-r] [-y metric [metric2]] [-u units] [-n hours]") [$(U location)]
+    $(B "wxforecast [-h] [-d] [-r] [-y metric [metric2]] [-u units] [-n count]") [$(U location)]
 
 $(B DESCRIPTION)
     Draws a chart of the National Weather Service hourly forecast (free, no key), with
@@ -19,11 +19,14 @@ $(B DESCRIPTION)
     hour under the axis. The chart shows as many hours as fit the terminal width.
     With $(B -r) it prints one raw line per hour instead, with the temperature, feels-like,
     dew point, humidity, cloud cover, chance of rain, expected rainfall, wind gust, wind and
-    conditions. Snowfall and visibility are chart-only metrics. With no $(U location) your IP
-    address is used. US only.
+    conditions. Snowfall and visibility are chart-only metrics. With $(B -d) it prints the daily
+    forecast instead, one line per day with the high, low, chance of rain, wind and conditions.
+    With no $(U location) your IP address is used. US only.
 
 $(B OPTIONS)
     $(B -h)           Show this help message
+
+    $(B -d)           Print the daily forecast, one line per day. $(B -r) and $(B -y) do not apply
 
     $(B -r)           Print raw rows, one line per hour, instead of the chart
 
@@ -40,7 +43,8 @@ $(B OPTIONS)
 
     $(B -u) $(U units)    $(I imperial) (°F, mph, in) or $(I si) (°C, km/h, mm) $(I '(default: imperial)')
 
-    $(B -n) $(U hours)    Number of hours to show, 1 to 156 $(I '(default: 24)')
+    $(B -n) $(U count)    Number of hours to show, 1 to 156, or days with $(B -d), 1 to 7
+                  $(I '(default: 24 hours, 7 days)')
 
     [$(U location)]    One of the following $(I '(default: your IP location)')
 
@@ -59,6 +63,10 @@ $(B EXAMPLES)
     Relative humidity chart
 
         wxforecast -y hum
+
+    The week ahead
+
+        wxforecast -d
 
     Temperature with expected rainfall on a second axis
 
@@ -88,6 +96,21 @@ function epochh(ts,    sign) {
     return days(substr(ts, 1, 4) + 0, substr(ts, 6, 2) + 0, substr(ts, 9, 2) + 0) * 24 + substr(ts, 12, 2) - sign * substr(ts, 21, 2)
 }'
 
+# awk helper: emoji(SHORTFORECAST, ISDAYTIME)
+AWK_EMOJI='
+function emoji(f, day) {
+            f = tolower(f)
+            if (f ~ /thunder/) return "⛈️"
+            if (f ~ /snow|flurries|sleet|ice|freezing/) return "❄️"
+            if (f ~ /rain|showers|drizzle/) return "🌧️"
+            if (f ~ /fog|haze|smoke/) return "🌫️"
+            if (f ~ /mostly cloudy|overcast|^cloudy/) return "☁️"
+            if (f ~ /partly/) return day ? "⛅" : "☁️"
+            if (f ~ /mostly (clear|sunny)/) return day ? "🌤️" : "🌙"
+            return day ? "☀️" : "🌙"
+        }
+'
+
 # grid_hours: read NWS grid data json, print "name UTC-hour value" for every hour of each block, in SI units.
 # Rainfall and snow are block totals (mm over the validTime period), spread evenly over its hours;
 # the rest are instantaneous values repeated over the block.
@@ -114,36 +137,34 @@ grid_hours() {
         }'
 }
 
+# place_of POINTS: "City, ST" from an api.weather.gov/points response
+place_of() { awk -F'"' '/"city": "[A-Z]/ { c = $4 } /"state": "[A-Z]/ { print c ", " $4; exit }' <<<"$1"; }
+
+# stamps_of JSON: ", updated DD-MMM-YYYY HH:MM, generated ..." from a forecast response
+stamps_of() {
+    local k t stamps=''
+    for k in updateTime:updated generatedAt:generated; do
+        t=$(sed -n "s/.*\"${k%:*}\": *\"\([^\"]*\)\".*/\1/p" <<<"$1" | head -1)
+        [[ -n $t ]] && stamps+=", ${k#*:} $(stamp_fmt "$(iso_epoch "$t")")"
+    done
+    echo "$stamps"
+}
+
 # forecast_for LAT LON HOURS METRIC GRAPH UNITS METRIC2: print HOURS of the NWS hourly forecast as a METRIC chart,
 # or as raw rows when GRAPH is 0
 forecast_for() {
-    local pt url grid place cols g hourly stamps='' k t
+    local pt url grid place cols g hourly
     pt=$(curl -fsSL -A "$UA" "https://api.weather.gov/points/$1,$2") || warn "No NWS forecast for $1,$2 (US only)"
     url=$(sed -n 's/.*"forecastHourly": *"\(.*\)".*/\1/p' <<<"$pt")
     grid=$(sed -n 's/.*"forecastGridData": *"\(.*\)".*/\1/p' <<<"$pt")
     g=$(curl -fsSL -A "$UA" "$grid" | grid_hours) || info "No grid data (rainfall, gusts, cloud cover) available"
-    place=$(awk -F'"' '/"city": "[A-Z]/ { c = $4 } /"state": "[A-Z]/ { print c ", " $4; exit }' <<<"$pt")
+    place=$(place_of "$pt")
     cols=$(tput cols 2>/dev/null || echo 80)
     hourly=$(curl -fsSL -A "$UA" "$url") || warn "Could not fetch the hourly forecast"
-    for k in updateTime:updated generatedAt:generated; do
-        t=$(sed -n "s/.*\"${k%:*}\": *\"\([^\"]*\)\".*/\1/p" <<<"$hourly" | head -1)
-        [[ -n $t ]] && stamps+=", ${k#*:} $(stamp_fmt "$(iso_epoch "$t")")"
-    done
-    info "${place:-$1,$2} hourly forecast (NWS)$stamps"
-    awk -v hours="$3" -v metric="$4" -v graph="$5" -v metric2="$7" -v cols="$cols" -v si="$([[ $6 == si ]] && echo 1 || echo 0)" "$AWK_TIME"'
+    info "${place:-$1,$2} hourly forecast (NWS)$(stamps_of "$hourly")"
+    awk -v hours="$3" -v metric="$4" -v graph="$5" -v metric2="$7" -v cols="$cols" -v si="$([[ $6 == si ]] && echo 1 || echo 0)" "$AWK_TIME$AWK_EMOJI"'
         FNR == NR { q[$1, $2] = $3; next }
         function val(l) { gsub(/^[^:]*: *"?|"?,? *$/, "", l); return l }
-        function emoji(f, day) {
-            f = tolower(f)
-            if (f ~ /thunder/) return "⛈️"
-            if (f ~ /snow|flurries|sleet|ice|freezing/) return "❄️"
-            if (f ~ /rain|showers|drizzle/) return "🌧️"
-            if (f ~ /fog|haze|smoke/) return "🌫️"
-            if (f ~ /mostly cloudy|overcast|^cloudy/) return "☁️"
-            if (f ~ /partly/) return day ? "⛅" : "☁️"
-            if (f ~ /mostly (clear|sunny)/) return day ? "🌤️" : "🌙"
-            return day ? "☀️" : "🌙"
-        }
         function mon(m) { return substr("JanFebMarAprMayJunJulAugSepOctNovDec", (m - 1) * 3 + 1, 3) }
         function grid(name, e) { return ((name, e) in q) ? q[name, e] : 0 }
         function cdeg(c) { return si ? c : c * 9 / 5 + 32 }
@@ -269,11 +290,65 @@ forecast_for() {
         }' <(printf '%s\n' "$g") - <<<"$hourly"
 }
 
+# daily_for LAT LON DAYS UNITS: print one row per day from the NWS 12 hour forecast periods
+daily_for() {
+    local pt url place daily
+    pt=$(curl -fsSL -A "$UA" "https://api.weather.gov/points/$1,$2") || warn "No NWS forecast for $1,$2 (US only)"
+    url=$(sed -n 's/.*"forecast": *"\(.*\)".*/\1/p' <<<"$pt")
+    place=$(place_of "$pt")
+    daily=$(curl -fsSL -A "$UA" "$url") || warn "Could not fetch the daily forecast"
+    info "${place:-$1,$2} daily forecast (NWS)$(stamps_of "$daily")"
+    awk -v ndays="$3" -v si="$([[ $4 == si ]] && echo 1 || echo 0)" "$AWK_TIME$AWK_EMOJI"'
+        function val(l) { gsub(/^[^:]*: *"?|"?,? *$/, "", l); return l }
+        function mon(m) { return substr("JanFebMarAprMayJunJulAugSepOctNovDec", (m - 1) * 3 + 1, 3) }
+        function dow(d,    names) { split("Thu Fri Sat Sun Mon Tue Wed", names, " "); return names[(d % 7 + 7) % 7 + 1] }
+        function conv(f) { return si ? (f - 32) * 5 / 9 : f }
+        # wind(S): convert every mph number in S to km/h for SI
+        function wind(w,    out, n) {
+            if (!si) return w
+            gsub(/mph/, "km/h", w)
+            out = ""
+            while (match(w, /[0-9]+/)) {
+                out = out substr(w, 1, RSTART - 1) sprintf("%.0f", substr(w, RSTART, RLENGTH) * 1.609344)
+                w = substr(w, RSTART + RLENGTH)
+            }
+            return out w
+        }
+        /"startTime"/ { t = val($0); date = substr(t, 1, 10) }
+        /"isDaytime"/ { day = val($0) == "true" }
+        /"temperature"/ { temp = val($0) }
+        /"probabilityOfPrecipitation"/ { sec = "pop" }
+        /"value"/ && sec == "pop" { pop = val($0) == "null" ? 0 : val($0); sec = "" }
+        /"windSpeed"/ { ws = val($0) }
+        /"windDirection"/ { wd = val($0) }
+        /"shortForecast"/ {
+            sf = val($0)
+            if (date != last) { n++; last = date; key[n] = date }
+            if (day) { hi[n] = temp; hasday[n] = 1; em[n] = emoji(sf, 1); sky[n] = sf; wnd[n] = wind(ws) " " wd }
+            else {
+                lo[n] = temp; haslo[n] = 1
+                if (!hasday[n]) { em[n] = emoji(sf, 0); sky[n] = sf; wnd[n] = wind(ws) " " wd }
+            }
+            if (pop > rain[n]) rain[n] = pop
+        }
+        END {
+            u = si ? "C" : "F"
+            printf "\033[4G%-11s %5s %5s %5s  %-16s %s\n", "DAY", "HIGH", "LOW", "RAIN", "WIND", "SKY"
+            for (i = 1; i <= n && i <= ndays; i++) {
+                y = substr(key[i], 1, 4); m = substr(key[i], 6, 2); d = substr(key[i], 9, 2)
+                label = dow(days(y + 0, m + 0, d + 0)) " " d "-" mon(m + 0)
+                printf "%s\033[4G%-11s %5s %5s %4d%%  %-16s %s\n", em[i], label,
+                    hasday[i] ? sprintf("%.0f°%s", conv(hi[i]), u) : "-", haslo[i] ? sprintf("%.0f°%s", conv(lo[i]), u) : "-", rain[i], wnd[i], sky[i]
+            }
+        }' <<<"$daily"
+}
+
 main() {
-    local hours=24 graph=1 metric=temp metric2="" units=imperial loc ll
+    local hours="" daily=0 graph=1 metric=temp metric2="" units=imperial loc ll
     while (($#)); do
         case $1 in
             -h) usage; exit 0 ;;
+            -d) daily=1 ;;
             -r) graph=0 ;;
             -y)
                 metric=$(argval "$@"); shift
@@ -289,15 +364,27 @@ main() {
     done
     (($# <= 1)) || warn "Unexpected argument: $2"
     loc=${1-}
-    [[ $hours =~ ^[0-9]+$ ]] || warn "Hours must be a number"
-    ((hours >= 1 && hours <= 156)) || warn "Hours must be 1 to 156"
+    if ((daily)); then
+        hours=${hours:-7}
+        [[ $hours =~ ^[0-9]+$ ]] || warn "Days must be a number"
+        ((hours >= 1 && hours <= 7)) || warn "Days must be 1 to 7"
+    else
+        hours=${hours:-24}
+        [[ $hours =~ ^[0-9]+$ ]] || warn "Hours must be a number"
+        ((hours >= 1 && hours <= 156)) || warn "Hours must be 1 to 156"
+    fi
     [[ $units == @(imperial|si) ]] || warn "Units must be imperial or si"
     is_metric "$metric" || warn "Metric must be ${METRICS//|/, }"
 
     command -v curl &>/dev/null || warn "curl not found"
     ll=$(latlon "$loc") || warn "Forecast needs a zip code or latitude,longitude"
-    # shellcheck disable=SC2086
-    forecast_for $ll "$hours" "$metric" "$graph" "$units" "$metric2"
+    if ((daily)); then
+        # shellcheck disable=SC2086
+        daily_for $ll "$hours" "$units"
+    else
+        # shellcheck disable=SC2086
+        forecast_for $ll "$hours" "$metric" "$graph" "$units" "$metric2"
+    fi
 }
 
 main "$@"

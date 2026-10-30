@@ -827,10 +827,10 @@
 
 <pre>
 <b>NAME</b>
-    <b>wxforecast</b> - Print the hourly weather forecast for a US location
+    <b>wxforecast</b> - Print the hourly or daily weather forecast for a US location
 
 <b>SYNOPSIS</b>
-    <b>wxforecast [-h] [-r] [-y metric [metric2]] [-u units] [-n hours]</b> [<u>location</u>]
+    <b>wxforecast [-h] [-d] [-r] [-y metric [metric2]] [-u units] [-n count]</b> [<u>location</u>]
 
 <b>DESCRIPTION</b>
     Draws a chart of the National Weather Service hourly forecast (free, no key), with
@@ -838,11 +838,14 @@
     hour under the axis. The chart shows as many hours as fit the terminal width.
     With <b>-r</b> it prints one raw line per hour instead, with the temperature, feels-like,
     dew point, humidity, cloud cover, chance of rain, expected rainfall, wind gust, wind and
-    conditions. Snowfall and visibility are chart-only metrics. With no <u>location</u> your IP
-    address is used. US only.
+    conditions. Snowfall and visibility are chart-only metrics. With <b>-d</b> it prints the daily
+    forecast instead, one line per day with the high, low, chance of rain, wind and conditions.
+    With no <u>location</u> your IP address is used. US only.
 
 <b>OPTIONS</b>
     <b>-h</b>           Show this help message
+
+    <b>-d</b>           Print the daily forecast, one line per day. <b>-r</b> and <b>-y</b> do not apply
 
     <b>-r</b>           Print raw rows, one line per hour, instead of the chart
 
@@ -859,7 +862,8 @@
 
     <b>-u</b> <u>units</u>    <i>imperial</i> (°F, mph, in) or <i>si</i> (°C, km/h, mm) <i>(default: imperial)</i>
 
-    <b>-n</b> <u>hours</u>    Number of hours to show, 1 to 156 <i>(default: 24)</i>
+    <b>-n</b> <u>count</u>    Number of hours to show, 1 to 156, or days with <b>-d</b>, 1 to 7
+                  <i>(default: 24 hours, 7 days)</i>
 
     [<u>location</u>]    One of the following <i>(default: your IP location)</i>
 
@@ -878,6 +882,10 @@
     Relative humidity chart
 
         wxforecast -y hum
+
+    The week ahead
+
+        wxforecast -d
 
     Temperature with expected rainfall on a second axis
 

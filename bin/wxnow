@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# Show the current weather observed at the nearest NWS station for a US location
+
+# shellcheck disable=SC2016
+source "$(dirname "$0")/common.sh"
+source "$(dirname "$0")/wxgeo.sh"
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B wxnow) - Show the current weather observed at the nearest station
+
+$(B SYNOPSIS)
+    $(B "wxnow [-h] [-u units]") [$(U location)]
+
+$(B DESCRIPTION)
+    Prints what the nearest National Weather Service observation station is measuring
+    now: temperature, feels-like, dew point, humidity, wind, pressure, visibility and
+    recent rainfall, with the station name and when it was observed. These are
+    measurements, not a forecast. Stations that report nothing are skipped and the next
+    nearest is used. With no $(U location) your IP address is used. US only.
+
+$(B OPTIONS)
+    $(B -h)           Show this help message
+
+    $(B -u) $(U units)    $(I imperial) (°F, mph, inHg, mi, in) or $(I si) (°C, km/h, hPa, km, mm) $(I '(default: imperial)')
+
+    [$(U location)]    One of the following $(I '(default: your IP location)')
+
+                  $(I 10001)               zip code
+                  $(I 40.71,-74.0)         latitude,longitude
+                  $(I KNYC)                observation station id
+
+$(B EXAMPLES)
+    Conditions where you are
+
+        wxnow
+
+    Conditions at a station in SI units
+
+        wxnow -u si KNYC
+
+EOF
+}
+
+# observation STATION: print the latest observation json of STATION
+observation() { curl -fsSL -A "$UA" "https://api.weather.gov/stations/$1/observations/latest"; }
+
+# has_temp JSON: true when the observation reports a temperature
+has_temp() { awk '/^        "temperature": *\{/ { f = 1 } f && /"value"/ { ok = $0 !~ /null/; f = 0 } END { exit !ok }' <<<"$1"; }
+
+# render JSON UNITS AGE: print the observation as labelled lines
+render() {
+    awk -v si="$([[ $2 == si ]] && echo 1 || echo 0)" -v age="$3" "$AWK_EMOJI"'
+        function val(l) { gsub(/^[^:]*: *"?|"?,? *$/, "", l); return l }
+        function num(k) { return (k in v) && v[k] != "null" && v[k] != "" }
+        function f(c) { return si ? c : c * 9 / 5 + 32 }
+        function compass(d,    names) { split("N NNE NE ENE E ESE SE SSE S SSW SW WSW W WNW NW NNW", names, " "); return names[int(d / 22.5 + 0.5) % 16 + 1] }
+        function arrow(d,    ar) { split("↑ ↗ → ↘ ↓ ↙ ← ↖", ar, " "); return ar[int(((d + 180) % 360) / 45 + 0.5) % 8 + 1] }
+        /^        "[A-Za-z0-9]+": *[\{\[]/ { split($1, k, "\""); sec = k[2] }
+        /^        "[A-Za-z0-9]+": *[^{\[ ]/ { split($1, k, "\""); top[k[2]] = val($0); sec = "" }
+        /"value"/ && sec != "" { v[sec] = val($0) }
+        END {
+            tu = si ? "C" : "F"
+            desc = top["textDescription"]; day = top["icon"] ~ /\/day\//
+            printf "%s\033[4G%s\n", emoji(desc, day), desc != "" ? desc : "No description"
+            feels = num("heatIndex") ? v["heatIndex"] : num("windChill") ? v["windChill"] : v["temperature"]
+            printf "Temperature   %.0f°%s    Feels like %.0f°%s\n", f(v["temperature"]), tu, f(feels), tu
+            if (num("dewpoint") || num("relativeHumidity")) {
+                printf "Dew point     "
+                if (num("dewpoint")) printf "%.0f°%s", f(v["dewpoint"]), tu
+                if (num("relativeHumidity")) printf "    Humidity %.0f%%", v["relativeHumidity"]
+                printf "\n"
+            }
+            if (num("windSpeed")) {
+                spd = v["windSpeed"] / (si ? 1 : 1.609344)
+                if (spd < 0.5) wind = "calm"
+                else wind = sprintf("%s %s %.0f %s", num("windDirection") ? compass(v["windDirection"]) : "", num("windDirection") ? arrow(v["windDirection"]) : "", spd, si ? "km/h" : "mph")
+                if (num("windGust")) wind = wind sprintf(", gusts %.0f", v["windGust"] / (si ? 1 : 1.609344))
+                printf "Wind          %s\n", wind
+            } else printf "Wind          -\n"
+            p = num("seaLevelPressure") ? v["seaLevelPressure"] : num("barometricPressure") ? v["barometricPressure"] : ""
+            printf "Pressure      %s", p == "" ? "-" : si ? sprintf("%.0f hPa", p / 100) : sprintf("%.2f inHg", p / 3386.389)
+            printf "    Visibility %s\n", num("visibility") ? (si ? sprintf("%.1f km", v["visibility"] / 1000) : sprintf("%.1f mi", v["visibility"] / 1609.344)) : "-"
+            if (num("precipitationLastHour"))
+                printf "Rain last hr  %s\n", si ? sprintf("%.1f mm", v["precipitationLastHour"]) : sprintf("%.2f in", v["precipitationLastHour"] / 25.4)
+            if (age != "") printf "Observed      %s\n", age
+        }' <<<"$1"
+}
+
+main() {
+    local units=imperial loc ll pt stations id obs='' name ts age=''
+    while (($#)); do
+        case $1 in
+            -h) usage; exit 0 ;;
+            -u) units=$(argval "$@" | tr "[:upper:]" "[:lower:]"); shift ;;
+            --) shift; break ;;
+            -*) warn "Unknown option: $1" ;;
+            *) break ;;
+        esac
+        shift
+    done
+    (($# <= 1)) || warn "Unexpected argument: $2"
+    loc=${1-}
+    [[ $units == @(imperial|si) ]] || warn "Units must be imperial or si"
+    command -v curl &>/dev/null || warn "curl not found"
+
+    local -a ids
+    if [[ $loc =~ ^[A-Za-z][A-Za-z0-9]{3}$ ]]; then
+        ids=("$(tr '[:lower:]' '[:upper:]' <<<"$loc")")
+    else
+        ll=$(latlon "$loc") || warn "Location must be a zip code, latitude,longitude or a station id"
+        # shellcheck disable=SC2086
+        set -- $ll
+        pt=$(curl -fsSL -A "$UA" "https://api.weather.gov/points/$1,$2") || warn "No NWS station for $1,$2 (US only)"
+        stations=$(sed -n 's/.*"observationStations": *"\(.*\)".*/\1/p' <<<"$pt")
+        mapfile -t ids < <(curl -fsSL -A "$UA" "$stations" | sed -n 's/.*"stationIdentifier": *"\([^"]*\)".*/\1/p' | head -5)
+    fi
+    ((${#ids[@]})) || warn "No observation stations found"
+
+    for id in "${ids[@]}"; do
+        obs=$(observation "$id") || continue
+        has_temp "$obs" && break
+        obs=''
+    done
+    [[ -n $obs ]] || warn "No recent observation from the nearest stations"
+
+    name=$(sed -n 's/.*"stationName": *"\([^"]*\)".*/\1/p' <<<"$obs" | head -1)
+    ts=$(sed -n 's/.*"timestamp": *"\([^"]*\)".*/\1/p' <<<"$obs" | head -1)
+    if [[ -n $ts ]]; then
+        local epoch mins
+        epoch=$(iso_epoch "$ts")
+        mins=$((($(date +%s) - epoch) / 60))
+        age="$(stamp_fmt "$epoch"), $mins min ago"
+        ((mins >= 120)) && age="$(stamp_fmt "$epoch"), $((mins / 60)) h ago"
+    fi
+    info "${name:-$id} ($id)"
+    render "$obs" "$units" "$age"
+}
+
+main "$@"

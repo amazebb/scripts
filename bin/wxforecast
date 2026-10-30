@@ -96,21 +96,6 @@ function epochh(ts,    sign) {
     return days(substr(ts, 1, 4) + 0, substr(ts, 6, 2) + 0, substr(ts, 9, 2) + 0) * 24 + substr(ts, 12, 2) - sign * substr(ts, 21, 2)
 }'
 
-# awk helper: emoji(SHORTFORECAST, ISDAYTIME)
-AWK_EMOJI='
-function emoji(f, day) {
-            f = tolower(f)
-            if (f ~ /thunder/) return "⛈️"
-            if (f ~ /snow|flurries|sleet|ice|freezing/) return "❄️"
-            if (f ~ /rain|showers|drizzle/) return "🌧️"
-            if (f ~ /fog|haze|smoke/) return "🌫️"
-            if (f ~ /mostly cloudy|overcast|^cloudy/) return "☁️"
-            if (f ~ /partly/) return day ? "⛅" : "☁️"
-            if (f ~ /mostly (clear|sunny)/) return day ? "🌤️" : "🌙"
-            return day ? "☀️" : "🌙"
-        }
-'
-
 # grid_hours: read NWS grid data json, print "name UTC-hour value" for every hour of each block, in SI units.
 # Rainfall and snow are block totals (mm over the validTime period), spread evenly over its hours;
 # the rest are instantaneous values repeated over the block.

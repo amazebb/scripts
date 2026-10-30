@@ -22,6 +22,7 @@
 - [shtomd](#shtomd)
 - [vbrhist](#vbrhist)
 - [wxforecast](#wxforecast)
+- [wxnow](#wxnow)
 - [wxradar](#wxradar)
 
 ## [build-nvim-nightly](https://github.com/amazebb/scripts/blob/master/bin/build-nvim-nightly)
@@ -898,6 +899,43 @@
     Raw rows for the next 48 hours
 
         wxforecast -r -n 48 60601
+</pre>
+
+## [wxnow](https://github.com/amazebb/scripts/blob/master/bin/wxnow)
+
+<pre>
+<b>NAME</b>
+    <b>wxnow</b> - Show the current weather observed at the nearest station
+
+<b>SYNOPSIS</b>
+    <b>wxnow [-h] [-u units]</b> [<u>location</u>]
+
+<b>DESCRIPTION</b>
+    Prints what the nearest National Weather Service observation station is measuring
+    now: temperature, feels-like, dew point, humidity, wind, pressure, visibility and
+    recent rainfall, with the station name and when it was observed. These are
+    measurements, not a forecast. Stations that report nothing are skipped and the next
+    nearest is used. With no <u>location</u> your IP address is used. US only.
+
+<b>OPTIONS</b>
+    <b>-h</b>           Show this help message
+
+    <b>-u</b> <u>units</u>    <i>imperial</i> (°F, mph, inHg, mi, in) or <i>si</i> (°C, km/h, hPa, km, mm) <i>(default: imperial)</i>
+
+    [<u>location</u>]    One of the following <i>(default: your IP location)</i>
+
+                  <i>10001</i>               zip code
+                  <i>40.71,-74.0</i>         latitude,longitude
+                  <i>KNYC</i>                observation station id
+
+<b>EXAMPLES</b>
+    Conditions where you are
+
+        wxnow
+
+    Conditions at a station in SI units
+
+        wxnow -u si KNYC
 </pre>
 
 ## [wxradar](https://github.com/amazebb/scripts/blob/master/bin/wxradar)

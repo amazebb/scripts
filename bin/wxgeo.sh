@@ -42,3 +42,18 @@ METRICS='temp|feels|dew|hum|cloud|rain|qpf|snow|wind|gust|vis'
 
 # is_metric NAME: true when NAME is a chart metric
 is_metric() { [[ "|$METRICS|" == *"|$1|"* ]]; }
+
+# awk helper: emoji(SHORTFORECAST, ISDAYTIME)
+AWK_EMOJI='
+function emoji(f, day) {
+            f = tolower(f)
+            if (f ~ /thunder/) return "⛈️"
+            if (f ~ /snow|flurries|sleet|ice|freezing/) return "❄️"
+            if (f ~ /rain|showers|drizzle/) return "🌧️"
+            if (f ~ /fog|haze|smoke/) return "🌫️"
+            if (f ~ /mostly cloudy|overcast|^cloudy/) return "☁️"
+            if (f ~ /partly/) return day ? "⛅" : "☁️"
+            if (f ~ /mostly (clear|sunny)/) return day ? "🌤️" : "🌙"
+            return day ? "☀️" : "🌙"
+        }
+'

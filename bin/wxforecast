@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Print the NWS hourly weather forecast for a US location as text
+
+# shellcheck disable=SC2016
+source "$(dirname "$0")/common.sh"
+source "$(dirname "$0")/wxgeo.sh"
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B wxforecast) - Print the hourly weather forecast for a US location
+
+$(B SYNOPSIS)
+    $(B "wxforecast [-h] [-n hours]") [$(U location)]
+
+$(B DESCRIPTION)
+    Prints one line per hour with the temperature, chance of rain, wind and
+    conditions, from the National Weather Service hourly forecast (free, no key).
+    With no $(U location) your IP address is used. US only.
+
+$(B OPTIONS)
+    $(B -h)           Show this help message
+
+    $(B -n) $(U hours)    Number of hours to show, 1 to 156 $(I '(default: 24)')
+
+    [$(U location)]    One of the following $(I '(default: your IP location)')
+
+                  $(I 10001)               zip code
+                  $(I 40.71,-74.0)         latitude,longitude
+
+$(B EXAMPLES)
+    The next 24 hours where you are
+
+        wxforecast
+
+    The next 48 hours for a zip code
+
+        wxforecast -n 48 60601
+
+EOF
+}
+
+# forecast_for LAT LON HOURS: print HOURS rows of the NWS hourly forecast
+forecast_for() {
+    local pt url place
+    pt=$(curl -fsSL -A "$UA" "https://api.weather.gov/points/$1,$2") || warn "No NWS forecast for $1,$2 (US only)"
+    url=$(sed -n 's/.*"forecastHourly": *"\(.*\)".*/\1/p' <<<"$pt")
+    place=$(awk -F'"' '/"city": "[A-Z]/ { c = $4 } /"state": "[A-Z]/ { print c ", " $4; exit }' <<<"$pt")
+    info "${place:-$1,$2} hourly forecast (NWS)"
+    curl -fsSL -A "$UA" "$url" | awk -v hours="$3" '
+        BEGIN {
+            split("Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec", mon, " ")
+            printf "%-12s %5s %5s  %-10s %s\n", "TIME", "TEMP", "RAIN", "WIND", "SKY"
+        }
+        function val(l) { gsub(/^[^:]*: *"?|"?,? *$/, "", l); return l }
+        /"startTime"/ { t = val($0); d = substr(t, 9, 2) "-" mon[substr(t, 6, 2) + 0] " " substr(t, 12, 5) }
+        /"temperature"/ { temp = val($0) }
+        /"probabilityOfPrecipitation"/ { sec = "rain" }
+        /"dewpoint"|"relativeHumidity"/ { sec = "" }
+        /"value"/ && sec == "rain" { rain = val($0); sec = "" }
+        /"windSpeed"/ { wind = val($0) }
+        /"windDirection"/ { wind = wind " " val($0) }
+        /"shortForecast"/ {
+            if (++n <= hours) printf "%-12s %4s° %4s%%  %-10s %s\n", d, temp, rain == "null" ? 0 : rain, wind, val($0)
+        }'
+}
+
+main() {
+    local hours=24 loc ll
+    while (($#)); do
+        case $1 in
+            -h) usage; exit 0 ;;
+            -n) hours=$(argval "$@"); shift ;;
+            --) shift; break ;;
+            -*) warn "Unknown option: $1" ;;
+            *) break ;;
+        esac
+        shift
+    done
+    (($# <= 1)) || warn "Unexpected argument: $2"
+    loc=${1-}
+    [[ $hours =~ ^[0-9]+$ ]] || warn "Hours must be a number"
+    ((hours >= 1 && hours <= 156)) || warn "Hours must be 1 to 156"
+
+    command -v curl &>/dev/null || warn "curl not found"
+    ll=$(latlon "$loc") || warn "Forecast needs a zip code or latitude,longitude"
+    # shellcheck disable=SC2086
+    forecast_for $ll "$hours"
+}
+
+main "$@"

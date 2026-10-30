@@ -3,16 +3,17 @@
 
 # shellcheck disable=SC2016
 source "$(dirname "$0")/common.sh"
+source "$(dirname "$0")/wxgeo.sh"
 
 BASE=https://radar.weather.gov/ridge/standard
 
 usage() {
     cat <<EOF
 $(B NAME)
-    $(B radar) - Show an animated weather radar loop around a US location
+    $(B wxradar) - Show an animated weather radar loop around a US location
 
 $(B SYNOPSIS)
-    $(B "radar [-h] [-m] [-n] [-l] [-f] [-t] [-r miles]") [$(U location)]
+    $(B "wxradar [-h] [-m] [-n] [-l] [-f] [-t] [-r miles]") [$(U location)]
 
 $(B DESCRIPTION)
     Builds a radar loop centred on $(U location) from RainViewer radar tiles over a
@@ -36,8 +37,8 @@ $(B OPTIONS)
 
     $(B -f)           Scale the image up to fill the terminal height $(I '(fullscreen with mpv)')
 
-    $(B -t)           Print the next 24 hours of forecast as text above the radar, from the
-                  NWS hourly forecast (free, no key). Needs a zip or latitude,longitude
+    $(B -t)           Print the next 24 hours of forecast as text above the radar, from
+                  $(B wxforecast). Needs a zip or latitude,longitude
 
     $(B -r) $(U miles)    Radius to show, about 10 to 400 $(I '(default: 50)')
 
@@ -54,23 +55,23 @@ $(B OPTIONS)
 $(B EXAMPLES)
     Radar within 50 miles of where you are
 
-        radar
+        wxradar
 
     Radar within 100 miles of a zip code
 
-        radar -r 100 60601
+        wxradar -r 100 60601
 
     The next 24 hours of weather as text above the radar
 
-        radar -t 60601
+        wxradar -t 60601
 
     The latest image only
 
-        radar -l
+        wxradar -l
 
     The whole northeast
 
-        radar northeast
+        wxradar northeast
 
 EOF
 }
@@ -83,56 +84,10 @@ graphics_term() {
 # station_for LAT LON: nearest NWS radar station id
 station_for() {
     local s
-    s=$(curl -fsSL -A 'radar (github.com/amazebb/scripts)' "https://api.weather.gov/points/$1,$2" |
+    s=$(curl -fsSL -A "$UA" "https://api.weather.gov/points/$1,$2" |
         sed -n 's/.*"radarStation": *"\([A-Z0-9]*\)".*/\1/p')
     [[ -n $s ]] || warn "No radar station for $1,$2 (US only)"
     echo "$s"
-}
-
-# forecast LAT LON: print the next 24 hours from the NWS hourly forecast
-forecast() {
-    local ua='radar (github.com/amazebb/scripts)' pt url place
-    pt=$(curl -fsSL -A "$ua" "https://api.weather.gov/points/$1,$2") || warn "No NWS forecast for $1,$2 (US only)"
-    url=$(sed -n 's/.*"forecastHourly": *"\(.*\)".*/\1/p' <<<"$pt")
-    place=$(awk -F'"' '/"city": "[A-Z]/ { c = $4 } /"state": "[A-Z]/ { print c ", " $4; exit }' <<<"$pt")
-    info "${place:-$1,$2} hourly forecast (NWS)"
-    curl -fsSL -A "$ua" "$url" | awk '
-        BEGIN {
-            split("Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec", mon, " ")
-            printf "%-12s %5s %5s  %-10s %s\n", "TIME", "TEMP", "RAIN", "WIND", "SKY"
-        }
-        function val(l) { gsub(/^[^:]*: *"?|"?,? *$/, "", l); return l }
-        /"startTime"/ { t = val($0); d = substr(t, 9, 2) "-" mon[substr(t, 6, 2) + 0] " " substr(t, 12, 5) }
-        /"temperature"/ { temp = val($0) }
-        /"probabilityOfPrecipitation"/ { sec = "rain" }
-        /"dewpoint"|"relativeHumidity"/ { sec = "" }
-        /"value"/ && sec == "rain" { rain = val($0); sec = "" }
-        /"windSpeed"/ { wind = val($0) }
-        /"windDirection"/ { wind = wind " " val($0) }
-        /"shortForecast"/ {
-            if (++n <= 24) printf "%-12s %4s° %4s%%  %-10s %s\n", d, temp, rain == "null" ? 0 : rain, wind, val($0)
-        }'
-}
-
-# latlon LOCATION: print "lat lon" for a zip, "lat,lon" or the IP location
-latlon() {
-    local loc=$1 json lat lon
-    case $loc in
-        '')
-            loc=$(curl -fsS https://ipinfo.io/loc) || warn "Could not determine your location"
-            echo "${loc%%,*} ${loc##*,}"
-            ;;
-        [0-9][0-9][0-9][0-9][0-9])
-            json=$(curl -fsSL "https://api.zippopotam.us/us/$loc") || warn "Unknown zip code: $loc"
-            lat=$(sed -n 's/.*"latitude": *"\([^"]*\)".*/\1/p' <<<"$json")
-            lon=$(sed -n 's/.*"longitude": *"\([^"]*\)".*/\1/p' <<<"$json")
-            echo "$lat $lon"
-            ;;
-        [-0-9]*,[-0-9]*)
-            echo "${loc%%,*} ${loc##*,}"
-            ;;
-        *) return 1 ;;
-    esac
 }
 
 # geometry LAT LON MILES: print "z x0 y0 cols rows cropx cropy size" for the 512px radar tiles
@@ -210,7 +165,7 @@ rainviewer() {
         done
     done
     info "$label ($lat,$lon), $mi mi, RainViewer, ${#paths[@]} frame(s) to $(stamp_fmt "$stamp")"
-    curl -fsSL -A "radar (github.com/amazebb/scripts)" --parallel --parallel-max 8 "${curl_args[@]}" || warn "Tile download failed"
+    curl -fsSL -A "$UA" --parallel --parallel-max 8 "${curl_args[@]}" || warn "Tile download failed"
 
     stitch "$d/b" "$mcols" "$mrows" "$d/base.png"
     for f in "${!paths[@]}"; do
@@ -252,11 +207,7 @@ main() {
     command -v curl &>/dev/null || warn "curl not found"
 
     local work gif ll name
-    if ((text)); then
-        ll=$(latlon "$loc") || warn "Forecast needs a zip code or latitude,longitude"
-        # shellcheck disable=SC2086
-        forecast $ll
-    fi
+    ((text)) && { "$(dirname "$0")/wxforecast" ${loc:+"$loc"} || exit 1; }
     work=$(mktemp -d "${TMPDIR:-/tmp}/radar.XXXXXX") || exit 1
     trap 'rm -rf "$work"' EXIT
     gif=$work/radar.gif

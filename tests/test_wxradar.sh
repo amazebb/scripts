@@ -23,7 +23,7 @@ esac'
 # a zip resolves to the radar and map tiles around it
 radar_zip() {
   radar_shims
-  "$BIN/radar" 10001 >/dev/null 2>&1
+  "$BIN/wxradar" 10001 >/dev/null 2>&1
   grep -q 'https://tiles.test/v2/radar/abc/512/7/37/48/6/1_1.png' "$TMP/urls" &&
     grep -q 'tile.openstreetmap.org/10/' "$TMP/urls"
 }
@@ -31,34 +31,34 @@ radar_zip() {
 # lat,lon works like a zip
 radar_latlon() {
   radar_shims
-  "$BIN/radar" 40.7484,-73.9967 >/dev/null 2>&1
+  "$BIN/wxradar" 40.7484,-73.9967 >/dev/null 2>&1
   grep -q '/512/7/37/48/' "$TMP/urls"
 }
 
 # no argument uses the ip location
 radar_ip() {
   radar_shims
-  "$BIN/radar" >/dev/null 2>&1
+  "$BIN/wxradar" >/dev/null 2>&1
   grep -q '/512/7/37/48/' "$TMP/urls"
 }
 
 # a larger radius zooms out
 radar_radius_zoom() {
   radar_shims
-  "$BIN/radar" -r 400 10001 >/dev/null 2>&1
+  "$BIN/wxradar" -r 400 10001 >/dev/null 2>&1
   grep -q '/512/5/' "$TMP/urls" && ! grep -q '/512/7/' "$TMP/urls"
 }
 
 # a radius outside 10-400 is rejected
 radar_bad_radius() {
   radar_shims
-  ! "$BIN/radar" -r 5 10001 >/dev/null 2>&1 && ! "$BIN/radar" -r x 10001 >/dev/null 2>&1
+  ! "$BIN/wxradar" -r 5 10001 >/dev/null 2>&1 && ! "$BIN/wxradar" -r x 10001 >/dev/null 2>&1
 }
 
 # -n plays the NWS loop of the nearest station
 radar_nws() {
   radar_shims
-  "$BIN/radar" -n 10001 >/dev/null 2>&1
+  "$BIN/wxradar" -n 10001 >/dev/null 2>&1
   grep -q '/KABC_loop.gif' "$TMP/urls" && ! grep -q 'weather-maps' "$TMP/urls"
 }
 
@@ -66,10 +66,10 @@ radar_nws() {
 radar_latest() {
   radar_shims
   shim mpv 'echo "$@" >"$TMP/played"'
-  "$BIN/radar" -l northeast >/dev/null 2>&1
+  "$BIN/wxradar" -l northeast >/dev/null 2>&1
   grep -q '/NORTHEAST_0.gif' "$TMP/urls" && [[ $(cat "$TMP/played") != *--loop* ]] || return 1
   rm -f "$TMP/urls"
-  "$BIN/radar" -l 10001 >/dev/null 2>&1
+  "$BIN/wxradar" -l 10001 >/dev/null 2>&1
   grep -q '/v2/radar/def' "$TMP/urls" && ! grep -q '/v2/radar/abc' "$TMP/urls"
 }
 
@@ -77,7 +77,7 @@ radar_latest() {
 radar_fill() {
   radar_shims
   shim chafa 'echo "$@" >"$TMP/chafa"'
-  TERM=xterm-ghostty "$BIN/radar" -f KOKX </dev/null >/dev/null 2>&1
+  TERM=xterm-ghostty "$BIN/wxradar" -f KOKX </dev/null >/dev/null 2>&1
   grep -q -- '--scale max' "$TMP/chafa"
 }
 
@@ -85,7 +85,7 @@ radar_fill() {
 radar_forecast() {
   radar_shims
   local out
-  out=$("$BIN/radar" -t 10001 2>&1)
+  out=$("$BIN/wxradar" -t 10001 2>&1)
   [[ $out == *"30-Oct 13:00   70°   40%  13 mph NW  Sunny"* ]] &&
     [[ ${out%%RainViewer*} == *"hourly forecast"* ]]
 }
@@ -93,13 +93,13 @@ radar_forecast() {
 # -t needs coordinates, not a station name
 radar_forecast_needs_coords() {
   radar_shims
-  ! "$BIN/radar" -t KOKX >/dev/null 2>&1
+  ! "$BIN/wxradar" -t KOKX >/dev/null 2>&1
 }
 
 # a region name plays the NWS loop, upper-cased
 radar_region() {
   radar_shims
-  "$BIN/radar" northeast >/dev/null 2>&1
+  "$BIN/wxradar" northeast >/dev/null 2>&1
   grep -q '/NORTHEAST_loop.gif' "$TMP/urls"
 }
 
@@ -107,7 +107,7 @@ radar_region() {
 radar_mpv_fallback() {
   radar_shims
   rm -f "$TMP/played"
-  "$BIN/radar" KOKX >/dev/null 2>&1
+  "$BIN/wxradar" KOKX >/dev/null 2>&1
   [[ -s $TMP/played ]]
 }
 
@@ -116,7 +116,7 @@ radar_chafa() {
   radar_shims
   shim chafa 'echo chafa >>"$TMP/icat"'
   rm -f "$TMP/played" "$TMP/icat"
-  TERM=xterm-ghostty "$BIN/radar" KOKX </dev/null >/dev/null 2>&1
+  TERM=xterm-ghostty "$BIN/wxradar" KOKX </dev/null >/dev/null 2>&1
   [[ -s $TMP/icat && ! -e $TMP/played ]]
 }
 
@@ -125,30 +125,30 @@ radar_ghostty() {
   radar_shims
   shim kitten 'echo icat >>"$TMP/icat"'
   rm -f "$TMP/played" "$TMP/icat" "$TMP/shim/chafa"
-  PATH="$TMP/shim:/usr/bin:/bin" TERM=xterm-ghostty "$BASH" "$BIN/radar" KOKX </dev/null >/dev/null 2>&1
+  PATH="$TMP/shim:/usr/bin:/bin" TERM=xterm-ghostty "$BASH" "$BIN/wxradar" KOKX </dev/null >/dev/null 2>&1
   [[ -s $TMP/icat && ! -e $TMP/played ]]
 }
 
 # extra arguments are rejected
 radar_extra_arg() {
   radar_shims
-  ! "$BIN/radar" a b >/dev/null 2>&1
+  ! "$BIN/wxradar" a b >/dev/null 2>&1
 }
 
-t "radar: zip resolves to tiles" radar_zip
-t "radar: lat,lon" radar_latlon
-t "radar: no argument uses ip location" radar_ip
-t "radar: radius sets zoom" radar_radius_zoom
-t "radar: rejects bad radius" radar_bad_radius
-t "radar: -n uses the nearest NWS station" radar_nws
-t "radar: -l shows the latest only" radar_latest
-t "radar: -f fills the terminal" radar_fill
-t "radar: -t prints the forecast above the radar" radar_forecast
-t "radar: -t rejects a station name" radar_forecast_needs_coords
-t "radar: region name" radar_region
-t "radar: mpv fallback" radar_mpv_fallback
-t "radar: ghostty uses chafa" radar_chafa
-t "radar: ghostty falls back to kitten" radar_ghostty
-t "radar: rejects extra argument" radar_extra_arg
+t "wxradar: zip resolves to tiles" radar_zip
+t "wxradar: lat,lon" radar_latlon
+t "wxradar: no argument uses ip location" radar_ip
+t "wxradar: radius sets zoom" radar_radius_zoom
+t "wxradar: rejects bad radius" radar_bad_radius
+t "wxradar: -n uses the nearest NWS station" radar_nws
+t "wxradar: -l shows the latest only" radar_latest
+t "wxradar: -f fills the terminal" radar_fill
+t "wxradar: -t prints the forecast above the radar" radar_forecast
+t "wxradar: -t rejects a station name" radar_forecast_needs_coords
+t "wxradar: region name" radar_region
+t "wxradar: mpv fallback" radar_mpv_fallback
+t "wxradar: ghostty uses chafa" radar_chafa
+t "wxradar: ghostty falls back to kitten" radar_ghostty
+t "wxradar: rejects extra argument" radar_extra_arg
 
 exit $FAILED

@@ -8,7 +8,7 @@ fc_shims() {
   *alerts/active*) [ -e "$TMP/alert" ] && printf "{\"features\": [\n{\n\"properties\": {\n                \"areaDesc\": \"X\",\n                \"severity\": \"Severe\",\n                \"event\": \"Flood Watch\",\n                \"ends\": \"2026-10-30T20:00:00-04:00\",\n}}]}" || echo "{\"features\": []}" ;;
   *forecast/hourly*) printf "\"generatedAt\": \"2026-10-30T18:04:24+00:00\",\n\"updateTime\": \"2026-10-30T16:14:57+00:00\",\n"; for h in 13 14; do printf "{\n\"startTime\": \"2026-10-30T$h:00:00-04:00\",\n\"isDaytime\": true,\n\"temperature\": 70,\n\"probabilityOfPrecipitation\": {\n\"value\": 40\n},\n\"dewpoint\": {\n\"value\": 10\n},\n\"relativeHumidity\": {\n\"value\": 45\n},\n\"windSpeed\": \"13 mph\",\n\"windDirection\": \"NW\",\n\"shortForecast\": \"Sunny\",\n}\n"; done ;;
   */forecast) printf "\"generatedAt\": \"2026-10-30T18:04:24+00:00\",\n"; for d in true false; do printf "{\n\"startTime\": \"2026-10-30T0$([ $d = true ] && echo 6 || echo 8):00:00-04:00\",\n\"isDaytime\": $d,\n\"temperature\": $([ $d = true ] && echo 70 || echo 50),\n\"probabilityOfPrecipitation\": {\n\"value\": $([ $d = true ] && echo 20 || echo 40)\n},\n\"windSpeed\": \"5 to 10 mph\",\n\"windDirection\": \"NW\",\n\"shortForecast\": \"$([ $d = true ] && echo Sunny || echo Mostly Clear)\",\n}\n"; done ;;
-  *gridpoints*) printf "        \"quantitativePrecipitation\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 5.08\n}\n]\n},\n        \"windGust\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 32.1869\n}\n]\n},\n        \"skyCover\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 30\n}\n]\n},\n        \"apparentTemperature\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 20\n}\n]\n},\n        \"snowfallAmount\": {\n" ;;
+  *gridpoints*) printf "        \"quantitativePrecipitation\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 5.08\n}\n]\n},\n        \"windGust\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 32.1869\n}\n]\n},\n        \"skyCover\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 30\n}\n]\n},\n        \"apparentTemperature\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 20\n}\n]\n},\n        \"relativeHumidity\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 40\n},\n{\n\"validTime\": \"2026-10-30T19:00:00+00:00/PT1H\",\n\"value\": 70\n}\n]\n},\n        \"snowfallAmount\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT1H\",\n\"value\": 12.7\n}\n]\n},\n        \"visibility\": {\n" ;;
   *api.weather.gov*) printf "\"forecastHourly\": \"https://api.weather.gov/gridpoints/X/1,1/forecast/hourly\",\n\"forecastGridData\": \"https://api.weather.gov/gridpoints/X/1,1\",\n\"forecast\": \"https://api.weather.gov/gridpoints/X/1,1/forecast\",\n" ;;
   *zippopotam*) echo "{\"places\":[{\"longitude\": \"-73.9967\", \"latitude\": \"40.7484\"}]}" ;;
   *ipinfo*) echo "40.7484,-73.9967" ;;
@@ -67,12 +67,12 @@ fc_stamps() {
   [[ $out == *"updated 30-Oct-2026 16:14, generated 30-Oct-2026 18:04"* ]]
 }
 
-# -d -r prints a row per day with high, low, rain and wind
+# -d -r prints a row per day with high, low, rain, totals, humidity low and high, peak gust and wind
 fc_daily() {
   fc_shims
   local out
   out=$("$BIN/wxforecast" -d -r 10001 2>&1 | sed 's/\x1b\[[0-9]*G/|/g')
-  [[ $out == *"daily forecast (NWS)"* && $out == *"|Fri 30-Oct   70°F  50°F   40%  5 to 10 mph NW   Sunny"* ]] || return 1
+  [[ $out == *"daily forecast (NWS)"* && $out == *"|Fri 30-Oct   70°F  50°F   40%     0.20      0.5  40%  70%   20  5 to 10 mph NW   Sunny"* ]] || return 1
   out=$("$BIN/wxforecast" -d -r -u si 10001 2>&1)
   [[ $out == *"21°C"*"10°C"*"8 to 16 km/h NW"* ]] &&
     ! "$BIN/wxforecast" -d -n 8 10001 >/dev/null 2>&1

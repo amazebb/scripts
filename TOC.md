@@ -883,7 +883,8 @@
     dew point, humidity, cloud cover, chance of rain, expected rainfall, wind gust, wind and
     conditions. Snowfall and visibility are chart-only metrics. With <b>-d</b> it shows the daily forecast
     instead: a chart of the high and low with the chance of rain, or with <b>-r</b> one line per day
-    with the high, low, chance of rain, wind and conditions.
+    with the high, low, chance of rain, total rainfall and snowfall, lowest and highest humidity, peak gust,
+    wind and conditions.
     With no <u>location</u> your IP address is used. US only.
 
 <b>OPTIONS</b>
@@ -893,7 +894,9 @@
                   alert is printed first, from <b>wxalerts</b>
 
     <b>-d</b>           Print the daily forecast as a chart of the high and low temperature with
-                  the chance of rain on a right hand axis, or one line per day with <b>-r</b>.
+                  the chance of rain on a right hand axis, or one line per day with <b>-r</b>, which
+                  adds the day's total rainfall and snowfall, lowest and highest
+                  humidity (HL, HH) and peak gust.
                   <b>-y</b> does not apply
 
     <b>-r</b>           Print raw rows, one line per hour, instead of the chart

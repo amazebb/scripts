@@ -22,7 +22,8 @@ $(B DESCRIPTION)
     dew point, humidity, cloud cover, chance of rain, expected rainfall, wind gust, wind and
     conditions. Snowfall and visibility are chart-only metrics. With $(B -d) it shows the daily forecast
     instead: a chart of the high and low with the chance of rain, or with $(B -r) one line per day
-    with the high, low, chance of rain, wind and conditions.
+    with the high, low, chance of rain, total rainfall and snowfall, lowest and highest humidity, peak gust,
+    wind and conditions.
     With no $(U location) your IP address is used. US only.
 
 $(B OPTIONS)
@@ -32,7 +33,9 @@ $(B OPTIONS)
                   alert is printed first, from $(B wxalerts)
 
     $(B -d)           Print the daily forecast as a chart of the high and low temperature with
-                  the chance of rain on a right hand axis, or one line per day with $(B -r).
+                  the chance of rain on a right hand axis, or one line per day with $(B -r), which
+                  adds the day's total rainfall and snowfall, lowest and highest
+                  humidity (HL, HH) and peak gust.
                   $(B -y) does not apply
 
     $(B -r)           Print raw rows, one line per hour, instead of the chart
@@ -128,13 +131,15 @@ forecast_for() {
 # daily_for LAT LON DAYS UNITS GRAPH: print the NWS 12 hour forecast periods as a high and low chart,
 # or one row per day when GRAPH is 0
 daily_for() {
-    local pt url place daily
+    local pt url grid g place daily
     pt=$(curl -fsSL -A "$UA" "https://api.weather.gov/points/$1,$2") || warn "No NWS forecast for $1,$2 (US only)"
     url=$(sed -n 's/.*"forecast": *"\(.*\)".*/\1/p' <<<"$pt")
+    grid=$(sed -n 's/.*"forecastGridData": *"\(.*\)".*/\1/p' <<<"$pt")
+    g=$(curl -fsSL -A "$UA" "$grid" | grid_hours) || info "No grid data (rainfall, gusts, humidity) available"
     place=$(place_of "$pt")
     daily=$(curl -fsSL -A "$UA" "$url") || warn "Could not fetch the daily forecast"
     info "${place:-$1,$2} daily forecast (NWS)$(stamps_of "$daily")"
-    awk -v ndays="$3" -v graph="$5" -v si="$([[ $4 == si ]] && echo 1 || echo 0)" -f "$AWKDIR/wx-time.awk" -f "$AWKDIR/wx-emoji.awk" -f "$AWKDIR/wxforecast-daily.awk" <<<"$daily"
+    awk -v ndays="$3" -v graph="$5" -v si="$([[ $4 == si ]] && echo 1 || echo 0)" -f "$AWKDIR/wx-time.awk" -f "$AWKDIR/wx-emoji.awk" -f "$AWKDIR/wxforecast-daily.awk" <(printf '%s\n' "$g") - <<<"$daily"
 }
 
 main() {

@@ -31,10 +31,11 @@ stamp_fmt() {
     if [[ -z $1 ]]; then date "$f"; else date -d "@$1" "$f" 2>/dev/null || date -r "$1" "$f"; fi
 }
 
-# iso_epoch TS: epoch seconds of an ISO 8601 UTC timestamp like 2026-10-30T18:04:24+00:00
+# iso_epoch TS: epoch seconds of an ISO 8601 timestamp with a UTC offset like +00:00 or -08:00
 iso_epoch() {
-    local ts=${1%+00:00}Z
-    date -d "$ts" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$ts" +%s
+    local ts=$1
+    [[ $ts =~ [+-][0-9][0-9]:[0-9][0-9]$ ]] && ts=${ts%:??}${ts: -2}
+    date -d "$ts" +%s 2>/dev/null || date -j -f '%Y-%m-%dT%H:%M:%S%z' "$ts" +%s
 }
 
 # chart metrics shared by wxforecast -y and wxradar -f

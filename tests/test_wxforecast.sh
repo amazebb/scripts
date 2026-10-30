@@ -5,6 +5,7 @@ source "$(dirname "$0")/lib.sh"
 # curl fakes the zip, points and hourly forecast apis with two periods
 fc_shims() {
   shim curl 'case "$*" in
+  *alerts/active*) [ -e "$TMP/alert" ] && printf "{\"features\": [\n{\n\"properties\": {\n                \"areaDesc\": \"X\",\n                \"severity\": \"Severe\",\n                \"event\": \"Flood Watch\",\n                \"ends\": \"2026-10-30T20:00:00-04:00\",\n}}]}" || echo "{\"features\": []}" ;;
   *forecast/hourly*) printf "\"generatedAt\": \"2026-10-30T18:04:24+00:00\",\n\"updateTime\": \"2026-10-30T16:14:57+00:00\",\n"; for h in 13 14; do printf "{\n\"startTime\": \"2026-10-30T$h:00:00-04:00\",\n\"isDaytime\": true,\n\"temperature\": 70,\n\"probabilityOfPrecipitation\": {\n\"value\": 40\n},\n\"dewpoint\": {\n\"value\": 10\n},\n\"relativeHumidity\": {\n\"value\": 45\n},\n\"windSpeed\": \"13 mph\",\n\"windDirection\": \"NW\",\n\"shortForecast\": \"Sunny\",\n}\n"; done ;;
   */forecast) printf "\"generatedAt\": \"2026-10-30T18:04:24+00:00\",\n"; for d in true false; do printf "{\n\"startTime\": \"2026-10-30T0$([ $d = true ] && echo 6 || echo 8):00:00-04:00\",\n\"isDaytime\": $d,\n\"temperature\": $([ $d = true ] && echo 70 || echo 50),\n\"probabilityOfPrecipitation\": {\n\"value\": $([ $d = true ] && echo 20 || echo 40)\n},\n\"windSpeed\": \"5 to 10 mph\",\n\"windDirection\": \"NW\",\n\"shortForecast\": \"$([ $d = true ] && echo Sunny || echo Mostly Clear)\",\n}\n"; done ;;
   *gridpoints*) printf "        \"quantitativePrecipitation\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 5.08\n}\n]\n},\n        \"windGust\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 32.1869\n}\n]\n},\n        \"skyCover\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 30\n}\n]\n},\n        \"apparentTemperature\": {\n\"values\": [\n{\n\"validTime\": \"2026-10-30T17:00:00+00:00/PT2H\",\n\"value\": 20\n}\n]\n},\n        \"snowfallAmount\": {\n" ;;
@@ -65,6 +66,18 @@ fc_daily() {
   out=$("$BIN/wxforecast" -d -u si 10001 2>&1)
   [[ $out == *"21°C"*"10°C"*"8 to 16 km/h NW"* ]] &&
     ! "$BIN/wxforecast" -d -n 8 10001 >/dev/null 2>&1
+}
+
+# an active alert is printed first, -A hides it
+fc_alert_banner() {
+  fc_shims
+  rm -f "$TMP/alert"
+  [[ $("$BIN/wxforecast" -r 10001 2>&1 | head -1) != *"Flood Watch"* ]] || return 1
+  touch "$TMP/alert"
+  local out
+  out=$("$BIN/wxforecast" -r 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+  [[ ${out%%$'\n'*} == "⚠ Flood Watch (Severe)"* ]] || return 1
+  [[ $("$BIN/wxforecast" -A -r 10001 2>&1 | head -1) != *"Flood Watch"* ]]
 }
 
 # -u si converts to C, km/h and mm
@@ -129,6 +142,7 @@ t "wxforecast: rejects bad hours" fc_bad_hours
 t "wxforecast: default chart" fc_graph
 t "wxforecast: status line shows update times" fc_stamps
 t "wxforecast: -d daily rows" fc_daily
+t "wxforecast: alert banner and -A" fc_alert_banner
 t "wxforecast: -u si" fc_si
 t "wxforecast: -y hum and dew" fc_hum_dew
 t "wxforecast: -y gust, cloud and feels" fc_grid_metrics

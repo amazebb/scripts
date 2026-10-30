@@ -11,7 +11,7 @@ $(B NAME)
     $(B wxforecast) - Print the hourly or daily weather forecast for a US location
 
 $(B SYNOPSIS)
-    $(B "wxforecast [-h] [-d] [-r] [-y metric [metric2]] [-u units] [-n count]") [$(U location)]
+    $(B "wxforecast [-h] [-A] [-d] [-r] [-y metric [metric2]] [-u units] [-n count]") [$(U location)]
 
 $(B DESCRIPTION)
     Draws a chart of the National Weather Service hourly forecast (free, no key), with
@@ -25,6 +25,9 @@ $(B DESCRIPTION)
 
 $(B OPTIONS)
     $(B -h)           Show this help message
+
+    $(B -A)           Do not show active weather alerts at the top. By default one line per
+                  alert is printed first, from $(B wxalerts)
 
     $(B -d)           Print the daily forecast, one line per day. $(B -r) and $(B -y) do not apply
 
@@ -329,10 +332,11 @@ daily_for() {
 }
 
 main() {
-    local hours="" daily=0 graph=1 metric=temp metric2="" units=imperial loc ll
+    local hours="" alerts=1 daily=0 graph=1 metric=temp metric2="" units=imperial loc ll
     while (($#)); do
         case $1 in
             -h) usage; exit 0 ;;
+            -A) alerts=0 ;;
             -d) daily=1 ;;
             -r) graph=0 ;;
             -y)
@@ -363,6 +367,7 @@ main() {
 
     command -v curl &>/dev/null || warn "curl not found"
     ll=$(latlon "$loc") || warn "Forecast needs a zip code or latitude,longitude"
+    ((alerts)) && "$(dirname "$0")/wxalerts" -b "${ll// /,}" >&2
     if ((daily)); then
         # shellcheck disable=SC2086
         daily_for $ll "$hours" "$units"

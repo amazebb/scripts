@@ -21,6 +21,7 @@
 - [shtoc](#shtoc)
 - [shtomd](#shtomd)
 - [vbrhist](#vbrhist)
+- [wxalerts](#wxalerts)
 - [wxforecast](#wxforecast)
 - [wxnow](#wxnow)
 - [wxradar](#wxradar)
@@ -824,6 +825,47 @@
         vbrhist -t -b 40 song.m4a
 </pre>
 
+## [wxalerts](https://github.com/amazebb/scripts/blob/master/bin/wxalerts)
+
+<pre>
+<b>NAME</b>
+    <b>wxalerts</b> - Show the active weather alerts for a US location
+
+<b>SYNOPSIS</b>
+    <b>wxalerts [-h] [-b] [-l]</b> [<u>location</u>]
+
+<b>DESCRIPTION</b>
+    Lists the watches, warnings and advisories the National Weather Service has in
+    effect for the point, most severe first, each with its severity, when it ends,
+    the headline and the affected area. Prints nothing special when there are none.
+    With no <u>location</u> your IP address is used. US only.
+
+<b>OPTIONS</b>
+    <b>-h</b>           Show this help message
+
+    <b>-b</b>           Brief: one line per alert, and nothing at all when there are none
+
+    <b>-l</b>           Long: also print the full description and instructions
+
+    [<u>location</u>]    One of the following <i>(default: your IP location)</i>
+
+                  <i>10001</i>               zip code
+                  <i>40.71,-74.0</i>         latitude,longitude
+
+<b>EXAMPLES</b>
+    Alerts where you are
+
+        wxalerts
+
+    One line per alert for a zip code
+
+        wxalerts -b 60601
+
+    The full text of every alert
+
+        wxalerts -l
+</pre>
+
 ## [wxforecast](https://github.com/amazebb/scripts/blob/master/bin/wxforecast)
 
 <pre>
@@ -831,7 +873,7 @@
     <b>wxforecast</b> - Print the hourly or daily weather forecast for a US location
 
 <b>SYNOPSIS</b>
-    <b>wxforecast [-h] [-d] [-r] [-y metric [metric2]] [-u units] [-n count]</b> [<u>location</u>]
+    <b>wxforecast [-h] [-A] [-d] [-r] [-y metric [metric2]] [-u units] [-n count]</b> [<u>location</u>]
 
 <b>DESCRIPTION</b>
     Draws a chart of the National Weather Service hourly forecast (free, no key), with
@@ -845,6 +887,9 @@
 
 <b>OPTIONS</b>
     <b>-h</b>           Show this help message
+
+    <b>-A</b>           Do not show active weather alerts at the top. By default one line per
+                  alert is printed first, from <b>wxalerts</b>
 
     <b>-d</b>           Print the daily forecast, one line per day. <b>-r</b> and <b>-y</b> do not apply
 

@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# Show the active NWS weather alerts for a US location
+
+# shellcheck disable=SC2016
+source "$(dirname "$0")/common.sh"
+source "$(dirname "$0")/wxgeo.sh"
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B wxalerts) - Show the active weather alerts for a US location
+
+$(B SYNOPSIS)
+    $(B "wxalerts [-h] [-b] [-l]") [$(U location)]
+
+$(B DESCRIPTION)
+    Lists the watches, warnings and advisories the National Weather Service has in
+    effect for the point, most severe first, each with its severity, when it ends,
+    the headline and the affected area. Prints nothing special when there are none.
+    With no $(U location) your IP address is used. US only.
+
+$(B OPTIONS)
+    $(B -h)           Show this help message
+
+    $(B -b)           Brief: one line per alert, and nothing at all when there are none
+
+    $(B -l)           Long: also print the full description and instructions
+
+    [$(U location)]    One of the following $(I '(default: your IP location)')
+
+                  $(I 10001)               zip code
+                  $(I 40.71,-74.0)         latitude,longitude
+
+$(B EXAMPLES)
+    Alerts where you are
+
+        wxalerts
+
+    One line per alert for a zip code
+
+        wxalerts -b 60601
+
+    The full text of every alert
+
+        wxalerts -l
+
+EOF
+}
+
+# alert_rows JSON: print one tab separated row per alert, most severe first:
+# severity, event, ends, headline, area, description, instructions. Newlines in the text become \x1f.
+alert_rows() {
+    awk '
+        function val(l) {
+            gsub(/^[^:]*: *"?|"?,? *$/, "", l)
+            gsub(/\\n/, "\037", l); gsub(/\\"/, "\"", l); gsub(/\t/, " ", l)
+            return l
+        }
+        /^                "areaDesc"/ { n++; area[n] = val($0) }
+        n && /^                "severity"/ { sev[n] = val($0) }
+        n && /^                "event"/ { event[n] = val($0) }
+        n && /^                "expires"/ { expires[n] = val($0) }
+        n && /^                "ends"/ { ends[n] = val($0) }
+        n && /^                "headline"/ { head[n] = val($0) }
+        n && /^                "description"/ { desc[n] = val($0) }
+        n && /^                "instruction"/ { instr[n] = val($0) == "null" ? "" : val($0) }
+        END {
+            split("Extreme Severe Moderate Minor Unknown", order, " ")
+            for (o = 1; o <= 5; o++)
+                for (i = 1; i <= n; i++)
+                    if ((o < 5 && sev[i] == order[o]) || (o == 5 && sev[i] != "Extreme" && sev[i] != "Severe" && sev[i] != "Moderate" && sev[i] != "Minor"))
+                        printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", sev[i], event[i], (ends[i] != "" && ends[i] != "null") ? ends[i] : expires[i], head[i], area[i], desc[i], instr[i]
+        }' <<<"$1"
+}
+
+# sev_color SEVERITY: ANSI color number for SEVERITY
+sev_color() {
+    case $1 in
+        Extreme | Severe) echo 31 ;;
+        Moderate) echo 33 ;;
+        *) echo 36 ;;
+    esac
+}
+
+main() {
+    local brief=0 long=0 loc ll json rows sev event ts head area desc instr until n=0 c
+    while (($#)); do
+        case $1 in
+            -h) usage; exit 0 ;;
+            -b) brief=1 ;;
+            -l) long=1 ;;
+            --) shift; break ;;
+            -*) warn "Unknown option: $1" ;;
+            *) break ;;
+        esac
+        shift
+    done
+    (($# <= 1)) || warn "Unexpected argument: $2"
+    loc=${1-}
+    command -v curl &>/dev/null || warn "curl not found"
+
+    ll=$(latlon "$loc") || warn "Alerts need a zip code or latitude,longitude"
+    # shellcheck disable=SC2086
+    set -- $ll
+    if ! json=$(curl -fsSL -A "$UA" "https://api.weather.gov/alerts/active?status=actual&point=$1,$2"); then
+        ((brief)) && exit 0
+        warn "Could not fetch alerts for $1,$2 (US only)"
+    fi
+    rows=$(alert_rows "$json")
+    if [[ -z $rows ]]; then
+        ((brief)) || info "No active alerts for $1,$2"
+        exit 0
+    fi
+
+    while IFS=$'\t' read -r sev event ts head area desc instr; do
+        c=$(sev_color "$sev")
+        until=''
+        [[ -n $ts ]] && until=" until $(stamp_fmt "$(iso_epoch "$ts")")"
+        if ((brief)); then
+            printf '\e[%sm⚠ %s (%s)%s\e[0m\n' "$c" "$event" "$sev" "$until"
+            continue
+        fi
+        ((n++)) && echo
+        printf '\e[1;%sm⚠ %s\e[0m \e[%sm(%s)%s\e[0m\n' "$c" "$event" "$c" "$sev" "$until"
+        [[ -n $head ]] && echo "  $head"
+        [[ -n $area ]] && echo "  Area: $area"
+        if ((long)); then
+            [[ -n $desc ]] && { echo; tr '\037' '\n' <<<"$desc" | sed 's/^/  /'; }
+            [[ -n $instr ]] && { echo; tr '\037' '\n' <<<"$instr" | sed 's/^/  /'; }
+        fi
+    done <<<"$rows"
+}
+
+main "$@"

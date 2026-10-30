@@ -830,7 +830,7 @@
     <b>wxforecast</b> - Print the hourly weather forecast for a US location
 
 <b>SYNOPSIS</b>
-    <b>wxforecast [-h] [-r] [-y metric] [-u units] [-n hours]</b> [<u>location</u>]
+    <b>wxforecast [-h] [-r] [-y metric [metric2]] [-u units] [-n hours]</b> [<u>location</u>]
 
 <b>DESCRIPTION</b>
     Draws a chart of the National Weather Service hourly forecast (free, no key), with
@@ -846,7 +846,9 @@
 
     <b>-r</b>           Print raw rows, one line per hour, instead of the chart
 
-    <b>-y</b> <u>metric</u>   Value for the chart y axis <i>(default: temp)</i>
+    <b>-y</b> <u>metric</u> [<u>metric2</u>]  Value for the chart y axis <i>(default: temp)</i>. A second metric
+                  goes on a right hand axis with its own scale, drawn as orange <i>◆</i>
+                  markers and labels. Wind and gust use an arrow pointing the way the wind blows
 
                   <i>temp</i>    temperature          <i>rain</i>   chance of rain
                   <i>feels</i>   feels-like           <i>qpf</i>    expected rainfall
@@ -876,6 +878,14 @@
     Relative humidity chart
 
         wxforecast -y hum
+
+    Temperature with expected rainfall on a second axis
+
+        wxforecast -y temp qpf
+
+    Temperature with wind direction arrows
+
+        wxforecast -y temp wind
 
     Raw rows for the next 48 hours
 

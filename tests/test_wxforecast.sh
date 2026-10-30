@@ -79,6 +79,16 @@ fc_grid_metrics() {
     "$BIN/wxforecast" -y feels 10001 2>&1 | grep -q 'Feels like (°F)'
 }
 
+# -y with two metrics adds a right axis with its own marker, and wind gets direction arrows
+fc_second_axis() {
+  fc_shims
+  local out
+  out=$("$BIN/wxforecast" -y temp qpf 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+  [[ $out == *"● Temperature (°F)   ◆ Expected rainfall (in/hr)"* && $out == *"◆"*"│ 0.10"* ]] || return 1
+  out=$("$BIN/wxforecast" -y temp wind 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+  [[ $out == *"↘"* ]] && ! "$BIN/wxforecast" -y temp x 10001 >/dev/null 2>&1
+}
+
 # -y qpf charts the expected rainfall spread over the grid block
 fc_qpf() {
   fc_shims
@@ -109,6 +119,7 @@ t "wxforecast: status line shows update times" fc_stamps
 t "wxforecast: -u si" fc_si
 t "wxforecast: -y hum and dew" fc_hum_dew
 t "wxforecast: -y gust, cloud and feels" fc_grid_metrics
+t "wxforecast: -y with a second metric" fc_second_axis
 t "wxforecast: -y qpf" fc_qpf
 t "wxforecast: -y metric" fc_graph_metric
 t "wxforecast: rejects a station name" fc_needs_coords

@@ -12,7 +12,7 @@ case "$*" in
   *ipinfo*) echo "40.7484,-73.9967" ;;
   *radar.weather.gov*) printf GIF >"$3" ;;
 esac'
-  shim ffmpeg 'for a; do o=$a; done; : >"$o"'
+  shim ffmpeg '[ "$1" = -hide_banner ] && exit 0; for a; do o=$a; done; : >"$o"'
   shim mpv 'echo played >>"$TMP/played"'
   rm -f "$TMP/urls"
   unset KITTY_WINDOW_ID TERM_PROGRAM

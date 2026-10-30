@@ -895,7 +895,7 @@
 
     <b>-r</b>           Print raw rows, one line per hour, instead of the chart
 
-    <b>-y</b> <u>metric</u> [<u>metric2</u>]  Value for the chart y axis <i>(default: temp)</i>. A second metric
+    <b>-y</b> <u>metric</u> [<u>metric2</u>]  Value for the chart y axis <i>(default: temp qpf)</i>. A second metric
                   goes on a right hand axis with its own scale, drawn as orange <i>◆</i>
                   markers and labels. Wind and gust use an arrow pointing the way the wind blows
 
@@ -917,7 +917,7 @@
                   <i>40.71,-74.0</i>         latitude,longitude
 
 <b>EXAMPLES</b>
-    Temperature chart with weather emoji for where you are
+    Temperature and expected rainfall chart with weather emoji for where you are
 
         wxforecast
 
@@ -933,9 +933,9 @@
 
         wxforecast -d
 
-    Temperature with expected rainfall on a second axis
+    Temperature only
 
-        wxforecast -y temp qpf
+        wxforecast -y temp
 
     Temperature with wind direction arrows
 

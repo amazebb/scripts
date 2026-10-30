@@ -34,7 +34,7 @@ $(B OPTIONS)
 
     $(B -r)           Print raw rows, one line per hour, instead of the chart
 
-    $(B -y) $(U metric) [$(U metric2)]  Value for the chart y axis $(I '(default: temp)'). A second metric
+    $(B -y) $(U metric) [$(U metric2)]  Value for the chart y axis $(I '(default: temp qpf)'). A second metric
                   goes on a right hand axis with its own scale, drawn as orange $(I ◆)
                   markers and labels. Wind and gust use an arrow pointing the way the wind blows
 
@@ -56,7 +56,7 @@ $(B OPTIONS)
                   $(I 40.71,-74.0)         latitude,longitude
 
 $(B EXAMPLES)
-    Temperature chart with weather emoji for where you are
+    Temperature and expected rainfall chart with weather emoji for where you are
 
         wxforecast
 
@@ -72,9 +72,9 @@ $(B EXAMPLES)
 
         wxforecast -d
 
-    Temperature with expected rainfall on a second axis
+    Temperature only
 
-        wxforecast -y temp qpf
+        wxforecast -y temp
 
     Temperature with wind direction arrows
 
@@ -134,22 +134,39 @@ daily_for() {
 }
 
 main() {
-    local hours="" alerts=1 daily=0 graph=1 metric=temp metric2="" units=imperial loc ll
+    local hours="" alerts=1 daily=0 graph=1 metric=temp metric2=qpf units=imperial loc ll
     while (($#)); do
         case $1 in
-            -h) usage; exit 0 ;;
-            -A) alerts=0 ;;
-            -d) daily=1 ;;
-            -r) graph=0 ;;
-            -y)
-                metric=$(argval "$@"); shift
-                if is_metric "${2-}"; then metric2=$2; shift; fi
-                ;;
-            -u) units=$(argval "$@" | tr "[:upper:]" "[:lower:]"); shift ;;
-            -n) hours=$(argval "$@"); shift ;;
-            --) shift; break ;;
-            -*) warn "Unknown option: $1" ;;
-            *) break ;;
+        -h)
+            usage
+            exit 0
+            ;;
+        -A) alerts=0 ;;
+        -d) daily=1 ;;
+        -r) graph=0 ;;
+        -y)
+            metric=$(argval "$@")
+            metric2=""
+            shift
+            if is_metric "${2-}"; then
+                metric2=$2
+                shift
+            fi
+            ;;
+        -u)
+            units=$(argval "$@" | tr "[:upper:]" "[:lower:]")
+            shift
+            ;;
+        -n)
+            hours=$(argval "$@")
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*) warn "Unknown option: $1" ;;
+        *) break ;;
         esac
         shift
     done

@@ -41,6 +41,16 @@ fc_bad_hours() {
   ! "$BIN/wxforecast" -n 0 10001 >/dev/null 2>&1 && ! "$BIN/wxforecast" -n 157 10001 >/dev/null 2>&1
 }
 
+# the default chart is temperature and expected rainfall, -y picks one metric alone
+fc_default_metrics() {
+  fc_shims
+  local out
+  out=$("$BIN/wxforecast" 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+  [[ $out == *"● Temperature (°F)   ◆ Expected rainfall (in/hr)"* ]] || return 1
+  out=$("$BIN/wxforecast" -y temp 10001 2>&1)
+  [[ $out == *"Temperature (°F)"* && $out != *"Expected rainfall"* ]]
+}
+
 # the default draws a dot per hour, an emoji per hour and the hour labels
 fc_graph() {
   fc_shims
@@ -139,6 +149,7 @@ t "wxforecast: -r rows for a zip" fc_rows
 t "wxforecast: -n limits the raw rows" fc_hours
 t "wxforecast: no argument uses ip location (raw)" fc_ip
 t "wxforecast: rejects bad hours" fc_bad_hours
+t "wxforecast: default temp and qpf" fc_default_metrics
 t "wxforecast: default chart" fc_graph
 t "wxforecast: status line shows update times" fc_stamps
 t "wxforecast: -d daily rows" fc_daily

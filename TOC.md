@@ -830,21 +830,24 @@
     <b>wxforecast</b> - Print the hourly weather forecast for a US location
 
 <b>SYNOPSIS</b>
-    <b>wxforecast [-h] [-r] [-y metric] [-n hours]</b> [<u>location</u>]
+    <b>wxforecast [-h] [-r] [-y metric] [-u units] [-n hours]</b> [<u>location</u>]
 
 <b>DESCRIPTION</b>
     Draws a chart of the National Weather Service hourly forecast (free, no key), with
     time along the x axis, the y metric as a dot per hour and a weather emoji for each
     hour under the axis. The chart shows as many hours as fit the terminal width.
     With <b>-r</b> it prints one raw line per hour instead, with the temperature, chance of
-    rain, wind and conditions. With no <u>location</u> your IP address is used. US only.
+    rain, expected rainfall, wind and conditions. With no <u>location</u> your IP address is used. US only.
 
 <b>OPTIONS</b>
     <b>-h</b>           Show this help message
 
     <b>-r</b>           Print raw rows, one line per hour, instead of the chart
 
-    <b>-y</b> <u>metric</u>   Value for the chart y axis: <i>temp</i>, <i>rain</i> or <i>wind</i> <i>(default: temp)</i>
+    <b>-y</b> <u>metric</u>   Value for the chart y axis: <i>temp</i>, <i>rain</i> chance, <i>qpf</i> expected
+                  rainfall in inches per hour, or <i>wind</i> <i>(default: temp)</i>
+
+    <b>-u</b> <u>units</u>    <i>imperial</i> (°F, mph, in) or <i>si</i> (°C, km/h, mm) <i>(default: imperial)</i>
 
     <b>-n</b> <u>hours</u>    Number of hours to show, 1 to 156 <i>(default: 24)</i>
 
@@ -858,9 +861,9 @@
 
         wxforecast
 
-    Chance of rain chart for a zip code
+    Expected rainfall chart for a zip code
 
-        wxforecast -y rain 60601
+        wxforecast -y qpf 60601
 
     Raw rows for the next 48 hours
 

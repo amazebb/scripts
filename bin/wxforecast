@@ -11,21 +11,24 @@ $(B NAME)
     $(B wxforecast) - Print the hourly weather forecast for a US location
 
 $(B SYNOPSIS)
-    $(B "wxforecast [-h] [-r] [-y metric] [-n hours]") [$(U location)]
+    $(B "wxforecast [-h] [-r] [-y metric] [-u units] [-n hours]") [$(U location)]
 
 $(B DESCRIPTION)
     Draws a chart of the National Weather Service hourly forecast (free, no key), with
     time along the x axis, the y metric as a dot per hour and a weather emoji for each
     hour under the axis. The chart shows as many hours as fit the terminal width.
     With $(B -r) it prints one raw line per hour instead, with the temperature, chance of
-    rain, wind and conditions. With no $(U location) your IP address is used. US only.
+    rain, expected rainfall, wind and conditions. With no $(U location) your IP address is used. US only.
 
 $(B OPTIONS)
     $(B -h)           Show this help message
 
     $(B -r)           Print raw rows, one line per hour, instead of the chart
 
-    $(B -y) $(U metric)   Value for the chart y axis: $(I temp), $(I rain) or $(I wind) $(I '(default: temp)')
+    $(B -y) $(U metric)   Value for the chart y axis: $(I temp), $(I rain) chance, $(I qpf) expected
+                  rainfall in inches per hour, or $(I wind) $(I '(default: temp)')
+
+    $(B -u) $(U units)    $(I imperial) (°F, mph, in) or $(I si) (°C, km/h, mm) $(I '(default: imperial)')
 
     $(B -n) $(U hours)    Number of hours to show, 1 to 156 $(I '(default: 24)')
 
@@ -39,9 +42,9 @@ $(B EXAMPLES)
 
         wxforecast
 
-    Chance of rain chart for a zip code
+    Expected rainfall chart for a zip code
 
-        wxforecast -y rain 60601
+        wxforecast -y qpf 60601
 
     Raw rows for the next 48 hours
 
@@ -50,16 +53,52 @@ $(B EXAMPLES)
 EOF
 }
 
-# forecast_for LAT LON HOURS METRIC GRAPH: print HOURS of the NWS hourly forecast as a METRIC chart,
+# awk helpers: epochh(TS) is the UTC hour count of an ISO 8601 timestamp with a whole-hour offset
+AWK_TIME='
+function days(y, m, d,    era, yoe, doy) {
+    if (m <= 2) y--
+    era = int(y / 400); yoe = y - era * 400
+    doy = int((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5) + d - 1
+    return era * 146097 + yoe * 365 + int(yoe / 4) - int(yoe / 100) + doy - 719468
+}
+function epochh(ts,    sign) {
+    sign = substr(ts, 20, 1) == "-" ? -1 : 1
+    return days(substr(ts, 1, 4) + 0, substr(ts, 6, 2) + 0, substr(ts, 9, 2) + 0) * 24 + substr(ts, 12, 2) - sign * substr(ts, 21, 2)
+}'
+
+# qpf_hours: read NWS grid data json, print "UTC-hour mm" for every hour of a block, the block total
+# (mm over its validTime period) divided evenly by its hours
+qpf_hours() {
+    awk "$AWK_TIME"'
+        /^        "[A-Za-z]+": *\{/ { inq = /quantitativePrecipitation/ }
+        inq && /"validTime"/ {
+            split($0, a, "\"")
+            split(a[4], v, "/")
+            h = 0
+            if (match(v[2], /[0-9]+D/)) h += substr(v[2], RSTART, RLENGTH - 1) * 24
+            if (match(v[2], /[0-9]+H/)) h += substr(v[2], RSTART, RLENGTH - 1)
+            start = epochh(v[1])
+        }
+        inq && /"value"/ && h > 0 {
+            x = $0; gsub(/[^0-9.]/, "", x)
+            for (k = 0; k < h; k++) printf "%d %.4f\n", start + k, x / h
+            h = 0
+        }'
+}
+
+# forecast_for LAT LON HOURS METRIC GRAPH UNITS: print HOURS of the NWS hourly forecast as a METRIC chart,
 # or as raw rows when GRAPH is 0
 forecast_for() {
-    local pt url place cols
+    local pt url grid place cols qpf
     pt=$(curl -fsSL -A "$UA" "https://api.weather.gov/points/$1,$2") || warn "No NWS forecast for $1,$2 (US only)"
     url=$(sed -n 's/.*"forecastHourly": *"\(.*\)".*/\1/p' <<<"$pt")
+    grid=$(sed -n 's/.*"forecastGridData": *"\(.*\)".*/\1/p' <<<"$pt")
+    qpf=$(curl -fsSL -A "$UA" "$grid" | qpf_hours) || info "No rainfall amounts available"
     place=$(awk -F'"' '/"city": "[A-Z]/ { c = $4 } /"state": "[A-Z]/ { print c ", " $4; exit }' <<<"$pt")
     cols=$(tput cols 2>/dev/null || echo 80)
     info "${place:-$1,$2} hourly forecast (NWS)"
-    curl -fsSL -A "$UA" "$url" | awk -v hours="$3" -v metric="$4" -v graph="$5" -v cols="$cols" '
+    curl -fsSL -A "$UA" "$url" | awk -v hours="$3" -v metric="$4" -v graph="$5" -v cols="$cols" -v si="$([[ $6 == si ]] && echo 1 || echo 0)" "$AWK_TIME"'
+        FNR == NR { q[$1] = $2; next }
         function val(l) { gsub(/^[^:]*: *"?|"?,? *$/, "", l); return l }
         function emoji(f, day) {
             f = tolower(f)
@@ -72,38 +111,40 @@ forecast_for() {
             if (f ~ /mostly (clear|sunny)/) return day ? "🌤️" : "🌙"
             return day ? "☀️" : "🌙"
         }
-        /"startTime"/ { t = val($0); n++; hh[n] = substr(t, 12, 2); dd[n] = substr(t, 9, 2) "-" mon(substr(t, 6, 2)); tm[n] = substr(t, 12, 5) }
+        /"startTime"/ { t = val($0); n++; amt[n] = (epochh(t) in q) ? q[epochh(t)] : 0; if (!si) amt[n] /= 25.4; hh[n] = substr(t, 12, 2); dd[n] = substr(t, 9, 2) "-" mon(substr(t, 6, 2)); tm[n] = substr(t, 12, 5) }
         /"isDaytime"/ { day = val($0) == "true" }
-        /"temperature"/ { temp[n] = val($0) }
+        /"temperature"/ { temp[n] = si ? (val($0) - 32) * 5 / 9 : val($0) }
         /"probabilityOfPrecipitation"/ { sec = "rain" }
         /"dewpoint"|"relativeHumidity"/ { sec = "" }
         /"value"/ && sec == "rain" { rain[n] = val($0) == "null" ? 0 : val($0); sec = "" }
-        /"windSpeed"/ { ws[n] = val($0); wind[n] = val($0) + 0 }
+        /"windSpeed"/ { wind[n] = val($0) * (si ? 1.609344 : 1); ws[n] = sprintf("%.0f %s", wind[n], si ? "km/h" : "mph") }
         /"windDirection"/ { wd[n] = val($0) }
         /"shortForecast"/ { sky[n] = val($0); em[n] = emoji(val($0), day) }
         function mon(m) { return substr("JanFebMarAprMayJunJulAugSepOctNovDec", (m - 1) * 3 + 1, 3) }
         END {
             if (!graph) {
-                printf "%-12s %5s %5s  %-10s %s\n", "TIME", "TEMP", "RAIN", "WIND", "SKY"
+                printf "%-12s %5s %5s %8s  %-11s %s\n", "TIME", "TEMP", "RAIN", si ? "AMT(mm)" : "AMT(in)", "WIND", "SKY"
                 for (i = 1; i <= n && i <= hours; i++)
-                    printf "%-12s %4s° %4s%%  %-10s %s\n", dd[i] " " tm[i], temp[i], rain[i], ws[i] " " wd[i], sky[i]
+                    printf "%-12s %4.0f°%s %4s%% %8s  %-11s %s\n", dd[i] " " tm[i], temp[i], si ? "C" : "F", rain[i], sprintf(si ? "%.1f" : "%.2f", amt[i]), ws[i] " " wd[i], sky[i]
                 exit
             }
             w = int((cols - 6) / 3); if (w < 1) w = 1
             m = hours < w ? hours : w; if (m > n) m = n
-            for (i = 1; i <= m; i++) y[i] = metric == "rain" ? rain[i] : metric == "wind" ? wind[i] : temp[i]
+            for (i = 1; i <= m; i++) y[i] = metric == "rain" ? rain[i] : metric == "qpf" ? amt[i] : metric == "wind" ? wind[i] : temp[i]
             lo = hi = y[1]
             for (i = 1; i <= m; i++) { if (y[i] < lo) lo = y[i]; if (y[i] > hi) hi = y[i] }
             if (metric == "rain") { lo = 0; hi = 100 }
+            if (metric == "qpf") { lo = 0; if (hi < (si ? 2 : 0.1)) hi = si ? 2 : 0.1 }
             h = 10
-            if (hi - lo < h - 1) hi = lo + h - 1
-            unit = metric == "rain" ? "%" : metric == "wind" ? " mph" : "°F"
-            title = metric == "rain" ? "Chance of rain" : metric == "wind" ? "Wind speed" : "Temperature"
-            printf "%s (%s)\n", title, substr(unit, metric == "wind" ? 2 : 1)
+            if (metric != "qpf" && hi - lo < h - 1) hi = lo + h - 1
+            unit = metric == "rain" ? "%" : metric == "qpf" ? (si ? "mm/hr" : "in/hr") : metric == "wind" ? (si ? "km/h" : "mph") : (si ? "°C" : "°F")
+            title = metric == "rain" ? "Chance of rain" : metric == "qpf" ? "Expected rainfall" : metric == "wind" ? "Wind speed" : "Temperature"
+            printf "%s (%s)\n", title, unit
             for (r = h - 1; r >= 0; r--) {
                 line = ""
                 for (i = 1; i <= m; i++) line = line ((int((y[i] - lo) / (hi - lo) * (h - 1) + 0.5) == r) ? " ● " : "   ")
-                printf "%4d │%s\n", lo + (hi - lo) * r / (h - 1) + 0.5, line
+                yv = lo + (hi - lo) * r / (h - 1)
+                printf "%4s │%s\n", metric == "qpf" ? sprintf(si ? "%.1f" : "%.2f", yv) : sprintf("%d", yv + 0.5), line
             }
             axis = ""
             for (i = 1; i <= m; i++) axis = axis "───"
@@ -115,16 +156,17 @@ forecast_for() {
             printf "\n"
             for (i = 1; i <= m; i++) if (i == 1 || hh[i] == "00") printf "\033[%dG%s", 7 + (i - 1) * 3 + 1, dd[i]
             printf "\n"
-        }'
+        }' <(printf '%s\n' "$qpf") -
 }
 
 main() {
-    local hours=24 graph=1 metric=temp loc ll
+    local hours=24 graph=1 metric=temp units=imperial loc ll
     while (($#)); do
         case $1 in
             -h) usage; exit 0 ;;
             -r) graph=0 ;;
             -y) metric=$(argval "$@"); shift ;;
+            -u) units=$(argval "$@" | tr "[:upper:]" "[:lower:]"); shift ;;
             -n) hours=$(argval "$@"); shift ;;
             --) shift; break ;;
             -*) warn "Unknown option: $1" ;;
@@ -136,12 +178,13 @@ main() {
     loc=${1-}
     [[ $hours =~ ^[0-9]+$ ]] || warn "Hours must be a number"
     ((hours >= 1 && hours <= 156)) || warn "Hours must be 1 to 156"
-    [[ $metric == @(temp|rain|wind) ]] || warn "Metric must be temp, rain or wind"
+    [[ $units == @(imperial|si) ]] || warn "Units must be imperial or si"
+    [[ $metric == @(temp|rain|qpf|wind) ]] || warn "Metric must be temp, rain, qpf or wind"
 
     command -v curl &>/dev/null || warn "curl not found"
     ll=$(latlon "$loc") || warn "Forecast needs a zip code or latitude,longitude"
     # shellcheck disable=SC2086
-    forecast_for $ll "$hours" "$metric" "$graph"
+    forecast_for $ll "$hours" "$metric" "$graph" "$units"
 }
 
 main "$@"

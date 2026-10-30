@@ -13,7 +13,7 @@ $(B NAME)
     $(B wxradar) - Show an animated weather radar loop around a US location
 
 $(B SYNOPSIS)
-    $(B "wxradar [-h] [-m] [-n] [-l] [-s] [-f [metric [metric2]]] [-r miles] [-F fps]") [$(U location)]
+    $(B "wxradar [-h] [-m] [-n] [-l] [-s] [-R] [-f [metric [metric2]]] [-r miles] [-F fps]") [$(U location)]
 
 $(B DESCRIPTION)
     Builds a radar loop centred on $(U location) from RainViewer radar tiles over a
@@ -39,8 +39,12 @@ $(B OPTIONS)
                   the $(B -f) forecast $(I '(fullscreen with mpv)')
 
     $(B -f) [$(U metric) [$(U metric2)]]
-                  Show the $(B wxforecast) chart above the radar, with the given y axis
-                  metrics $(I '(default: temp qpf)'). Needs a zip or latitude,longitude
+                  Choose the $(B wxforecast) y axis metrics for the chart shown above the
+                  radar $(I '(default: temp qpf)'). The chart is shown by default for a zip,
+                  latitude,longitude or your IP location, and is skipped for station and
+                  region names. Giving $(B -f) with a name is an error
+
+    $(B -R)           Radar only, no forecast chart
 
     $(B -r) $(U miles)    Radius to show, about 10 to 400 $(I '(default: 50)')
 
@@ -67,7 +71,11 @@ $(B EXAMPLES)
 
     The forecast chart above a radar filling the rest of the terminal
 
-        wxradar -f -s 60601
+        wxradar -s 60601
+
+    Radar only
+
+        wxradar -R 60601
 
     The forecast chart with humidity and wind gusts
 
@@ -185,7 +193,7 @@ rainviewer() {
 }
 
 main() {
-    local mpv=0 nws=0 latest=0 size=0 fcast=0 fm=(temp qpf) loc='' mi=50 fps=1
+    local mpv=0 nws=0 latest=0 size=0 fcast=1 fexplicit=0 fm=(temp qpf) loc='' mi=50 fps=1
     while (($#)); do
         case $1 in
             -h) usage; exit 0 ;;
@@ -193,8 +201,9 @@ main() {
             -n) nws=1 ;;
             -l) latest=1 ;;
             -s) size=1 ;;
+            -R) fcast=0 ;;
             -f)
-                fcast=1
+                fcast=1 fexplicit=1
                 if is_metric "${2-}"; then
                     fm=("$2"); shift
                     if is_metric "${2-}"; then fm+=("$2"); shift; fi
@@ -219,6 +228,7 @@ main() {
 
     local work gif ll name cols rows fh=0 fout
     ((size && !mpv)) && graphics_term && printf '\e[H\e[2J'
+    ((!fexplicit)) && [[ -n $loc && $loc != [0-9][0-9][0-9][0-9][0-9] && $loc != [-0-9]*,[-0-9]* ]] && fcast=0
     if ((fcast)); then
         fout=$("$(dirname "$0")/wxforecast" -y "${fm[@]}" ${loc:+"$loc"} 2>&1) || { printf '%s\n' "$fout"; exit 1; }
         printf '%s\n' "$fout"

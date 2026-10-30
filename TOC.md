@@ -899,7 +899,7 @@
     <b>wxradar</b> - Show an animated weather radar loop around a US location
 
 <b>SYNOPSIS</b>
-    <b>wxradar [-h] [-m] [-n] [-l] [-s] [-f [metric [metric2]]] [-r miles] [-F fps]</b> [<u>location</u>]
+    <b>wxradar [-h] [-m] [-n] [-l] [-s] [-R] [-f [metric [metric2]]] [-r miles] [-F fps]</b> [<u>location</u>]
 
 <b>DESCRIPTION</b>
     Builds a radar loop centred on <u>location</u> from RainViewer radar tiles over a
@@ -925,8 +925,12 @@
                   the <b>-f</b> forecast <i>(fullscreen with mpv)</i>
 
     <b>-f</b> [<u>metric</u> [<u>metric2</u>]]
-                  Show the <b>wxforecast</b> chart above the radar, with the given y axis
-                  metrics <i>(default: temp qpf)</i>. Needs a zip or latitude,longitude
+                  Choose the <b>wxforecast</b> y axis metrics for the chart shown above the
+                  radar <i>(default: temp qpf)</i>. The chart is shown by default for a zip,
+                  latitude,longitude or your IP location, and is skipped for station and
+                  region names. Giving <b>-f</b> with a name is an error
+
+    <b>-R</b>           Radar only, no forecast chart
 
     <b>-r</b> <u>miles</u>    Radius to show, about 10 to 400 <i>(default: 50)</i>
 
@@ -953,7 +957,11 @@
 
     The forecast chart above a radar filling the rest of the terminal
 
-        wxradar -f -s 60601
+        wxradar -s 60601
+
+    Radar only
+
+        wxradar -R 60601
 
     The forecast chart with humidity and wind gusts
 

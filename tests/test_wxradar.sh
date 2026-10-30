@@ -81,14 +81,14 @@ radar_fill() {
   grep -q -- '--scale max' "$TMP/chafa"
 }
 
-# -s leaves room for the -f forecast chart
+# -s leaves room for the forecast chart
 radar_fill_minus_forecast() {
   radar_shims
   shim chafa 'echo "$@" >"$TMP/chafa"'
   local a b
-  TERM=xterm-ghostty "$BIN/wxradar" -s 10001 </dev/null >/dev/null 2>&1
+  TERM=xterm-ghostty "$BIN/wxradar" -R -s 10001 </dev/null >/dev/null 2>&1
   a=$(sed -n 's/.*--size [0-9]*x\([0-9]*\).*/\1/p' "$TMP/chafa")
-  TERM=xterm-ghostty "$BIN/wxradar" -f -s 10001 </dev/null >/dev/null 2>&1
+  TERM=xterm-ghostty "$BIN/wxradar" -s 10001 </dev/null >/dev/null 2>&1
   b=$(sed -n 's/.*--size [0-9]*x\([0-9]*\).*/\1/p' "$TMP/chafa")
   ((a > 0 && b > 0 && b < a))
 }
@@ -105,12 +105,20 @@ radar_fps() {
   ! "$BIN/wxradar" -F 0 10001 >/dev/null 2>&1 && ! "$BIN/wxradar" -F fast 10001 >/dev/null 2>&1
 }
 
-# -f prints the forecast chart before the radar status line
+# the forecast chart is printed by default before the radar status line
 radar_forecast() {
   radar_shims
   local out
-  out=$("$BIN/wxradar" -f 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+  out=$("$BIN/wxradar" 10001 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
   [[ $out == *"● Temperature (°F)   ◆ Expected rainfall (in/hr)"* && ${out%%RainViewer*} == *"hourly forecast"* ]]
+}
+
+# the chart is on by default; -R and station or region names skip it
+radar_forecast_default() {
+  radar_shims
+  "$BIN/wxradar" 10001 2>&1 | grep -q 'hourly forecast' &&
+    ! "$BIN/wxradar" -R 10001 2>&1 | grep -q 'hourly forecast' &&
+    ! "$BIN/wxradar" northeast 2>&1 | grep -q 'hourly forecast'
 }
 
 # -f takes the metrics for the chart
@@ -123,7 +131,7 @@ radar_forecast_metrics() {
   [[ $out == *"Cloud cover (%)"* && $out != *"Expected rainfall"* ]]
 }
 
-# -f needs coordinates, not a station name
+# an explicit -f needs coordinates, not a station name
 radar_forecast_needs_coords() {
   radar_shims
   ! "$BIN/wxradar" -f KOKX >/dev/null 2>&1
@@ -179,6 +187,7 @@ t "wxradar: -F frame rate" radar_fps
 t "wxradar: -s fills the terminal" radar_fill
 t "wxradar: -s leaves room for -f" radar_fill_minus_forecast
 t "wxradar: -f prints the forecast above the radar" radar_forecast
+t "wxradar: forecast chart by default, -R and names skip it" radar_forecast_default
 t "wxradar: -f takes chart metrics" radar_forecast_metrics
 t "wxradar: -f rejects a station name" radar_forecast_needs_coords
 t "wxradar: region name" radar_region

@@ -8,20 +8,22 @@ See [TOC](TOC.md) for per-script usage
 
 ## Install
 
-Clone into `~/.local/share` and run the install script to symlink all scripts into `~/.local/bin`:
+Clone into `~/.local/share` and add `bin/` to your `$PATH`. Nothing is copied or linked, so the scripts
+cannot overwrite, or be overwritten by, other tools in `~/.local/bin`:
 
 ```bash
 mkdir -p ~/.local/share
 git clone --depth 1 https://github.com/amazebb/scripts.git ~/.local/share/scripts
-cd ~/.local/share/scripts
-./install.sh
 ```
 
-Make sure `~/.local/bin` is in your `$PATH`. Add this to your `~/.bashrc` or `~/.zshrc` if it isn't already:
+Add this to your `~/.zshrc` or `~/.bashrc`:
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$PATH:$HOME/.local/share/scripts/bin"
 ```
+
+Appending means a tool of the same name found earlier on your `$PATH` wins. Prepend instead to make
+these scripts win.
 
 ## Weather
 
@@ -45,16 +47,15 @@ notes on keeping radar history.
 
 Needs `curl` and `awk`. `wxradar` also needs `ffmpeg`, plus `chafa`, `kitten` or `mpv` to display the
 loop. `wxradar` and `wxnow` use `mapfile`, so on macOS install a newer bash (`brew install bash`) and
-put it first in your `$PATH`. The helper files are in `bin/wx/`, so re-run `./install.sh` after pulling to
-link that folder.
+put it first in your `$PATH`.
 
 ## Scheduled jobs
 
 Some scripts are meant to run on a schedule. macOS uses `launchd` for this, and
 the agent definitions live in [launchd/](launchd/).
 
-They are opt-in, since installing one starts a recurring background job, so
-`install.sh` leaves them alone. Install and load them with:
+They are opt-in, since installing one starts a recurring background job, so adding
+`bin/` to your `$PATH` does not install them. Install and load them with:
 
 ```bash
 ./install-agents.sh

@@ -192,7 +192,7 @@ OPENER='(( FZF_SELECT_COUNT == 0 )) && nvim {1} +{2} || nvim +cw -q {+f}'
 BAT_OPTS='--theme=TwoDark --style=full --wrap=character --color=always'
 # --files output has no line number, so bat the whole file with nothing highlighted.
 # Pass flag and line as separate words so preview works under zsh (no word-splitting).
-PREVIEW='HL={2}; case {1} in *.pdf) ~/.local/bin/_pre-rg {1} | nl -ba -w1 -s" " | bat '"$BAT_OPTS"' ${HL:+--highlight-line} ${HL:+"$HL"} ;; *) bat '"$BAT_OPTS"' ${HL:+--highlight-line} ${HL:+"$HL"} {1} ;; esac'
+PREVIEW='HL={2}; case {1} in *.pdf) "'"$SCRIPT_DIR"'/_pre-rg" {1} | nl -ba -w1 -s" " | bat '"$BAT_OPTS"' ${HL:+--highlight-line} ${HL:+"$HL"} ;; *) bat '"$BAT_OPTS"' ${HL:+--highlight-line} ${HL:+"$HL"} {1} ;; esac'
 
 fzf --disabled --ansi --multi \
     --bind "start:$RELOAD" --bind "change:$RELOAD" \

@@ -13,9 +13,11 @@ case "$*" in
   *ipinfo*) echo "40.7484,-73.9967" ;;
   *radar.weather.gov*) printf GIF >"$3" ;;
 esac'
-  shim ffmpeg '[ "$1" = -hide_banner ] && exit 0; echo "$@" >>"$TMP/ffargs"; for a; do o=$a; done; : >"$o"'
+  shim ffmpeg '[ "$1" = -hide_banner ] && { echo drawtext; exit 0; }; echo "$@" >>"$TMP/ffargs"; for a; do o=$a; done; : >"$o"'
   shim mpv 'echo played >>"$TMP/played"'
   rm -f "$TMP/urls"
+  export XDG_CACHE_HOME="$TMP/cache"
+  rm -rf "$TMP/cache"
   unset KITTY_WINDOW_ID TERM_PROGRAM
   export TERM=xterm
 }
@@ -91,6 +93,33 @@ radar_fill_minus_forecast() {
   TERM=xterm-ghostty "$BIN/wxradar" -s 10001 </dev/null >/dev/null 2>&1
   b=$(sed -n 's/.*--size [0-9]*x\([0-9]*\).*/\1/p' "$TMP/chafa")
   ((a > 0 && b > 0 && b < a))
+}
+
+# the image credits OpenStreetMap and RainViewer
+radar_credit() {
+  radar_shims
+  rm -f "$TMP/ffargs"
+  "$BIN/wxradar" -R 10001 >/dev/null 2>&1
+  grep filter_complex "$TMP/ffargs" | grep -q '© OpenStreetMap contributors · RainViewer.com'
+}
+
+# map tiles under 7 days old come from the cache, older ones are fetched again
+radar_tile_cache() {
+  radar_shims
+  "$BIN/wxradar" -R 10001 >/dev/null 2>&1
+  local url file
+  url=$(grep -o 'https://tile.openstreetmap.org/[0-9/]*\.png' "$TMP/urls" | head -1)
+  [[ -n $url ]] || return 1
+  file=$TMP/cache/wx/osm/${url#https://tile.openstreetmap.org/}
+  mkdir -p "$(dirname "$file")"
+  echo tile >"$file"
+  rm -f "$TMP/urls"
+  "$BIN/wxradar" -R 10001 >/dev/null 2>&1
+  ! grep -q "$url" "$TMP/urls" || return 1
+  touch -t 202001010000 "$file"
+  rm -f "$TMP/urls"
+  "$BIN/wxradar" -R 10001 >/dev/null 2>&1
+  grep -q "$url" "$TMP/urls"
 }
 
 # -F sets the loop frame rate, 1 fps by default
@@ -183,6 +212,8 @@ t "wxradar: radius sets zoom" radar_radius_zoom
 t "wxradar: rejects bad radius" radar_bad_radius
 t "wxradar: -n uses the nearest NWS station" radar_nws
 t "wxradar: -l shows the latest only" radar_latest
+t "wxradar: image credits OSM and RainViewer" radar_credit
+t "wxradar: tile cache" radar_tile_cache
 t "wxradar: -F frame rate" radar_fps
 t "wxradar: -s fills the terminal" radar_fill
 t "wxradar: -s leaves room for -f" radar_fill_minus_forecast

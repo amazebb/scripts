@@ -1013,7 +1013,9 @@
     is used. With <b>-n</b>, or for a radar station or region name, the fixed NWS loop from
     radar.weather.gov is played instead (nearest station, about 140 miles) and
     <b>-r</b> and <b>-F</b> are ignored. Only the RainViewer loop needs ffmpeg.
-    Map data is from OpenStreetMap, radar from RainViewer.
+    Map data © OpenStreetMap contributors, radar by RainViewer.com; both are credited on the image
+    (on a status line if ffmpeg has no drawtext).
+    Downloaded tiles are cached in ~/.cache/wx for 7 days.
 
     In kitty or ghostty the gif is drawn directly in the terminal with <b>chafa</b>
     (<i>Ctrl-C</i> to quit) or <b>kitten</b> if installed, otherwise it is played with mpv.

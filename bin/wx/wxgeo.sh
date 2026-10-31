@@ -4,6 +4,9 @@
 # shellcheck disable=SC2034
 UA='wx (github.com/amazebb/scripts)'
 
+# cache for map and radar tiles, which the OpenStreetMap tile policy asks us to keep for at least 7 days
+WXCACHE=${XDG_CACHE_HOME:-$HOME/.cache}/wx
+
 # directory of the *.awk files, next to this file
 AWKDIR=$(dirname "$0")/wx
 

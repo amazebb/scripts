@@ -40,7 +40,8 @@ Active alerts are also printed above the `wxforecast` and `wxradar` output.
 Data comes from the National Weather Service API (forecasts, observations, alerts), RainViewer (radar),
 OpenStreetMap (map tiles), zippopotam.us (zip codes) and ipinfo.io (IP location). None need a key.
 The radar image credits OpenStreetMap and RainViewer as their terms require, and map and radar tiles are
-cached in `~/.cache/wx` for 7 days.
+cached in `~/.cache/wx` for 7 days. See [WEATHER.md](WEATHER.md) for the data sources, their terms and
+notes on keeping radar history.
 
 Needs `curl` and `awk`. `wxradar` also needs `ffmpeg`, plus `chafa`, `kitten` or `mpv` to display the
 loop. `wxradar` and `wxnow` use `mapfile`, so on macOS install a newer bash (`brew install bash`) and

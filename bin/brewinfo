@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2016
+source "$(dirname "$0")/common.sh"
+
+categories="$(dirname "$0")/homebrew/categories.txt"
+dir=~/Code/GitHub/amazebb
+port=8000
+run=0 serve=0
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B brewinfo) - Build and serve the brewbar package list
+
+$(B SYNOPSIS)
+    $(B "brewinfo [-h] [-r] [-s] [-d dir]")
+
+$(B DESCRIPTION)
+    Writes packages.tsv and packages.json to $(U dir)/brewbar/docs/data from the
+    installed Homebrew packages and homebrew/categories.txt, and serves the
+    site with the python web server.
+
+$(B OPTIONS)
+    $(B -h)           Show this help message
+
+    $(B -r)           Process the installed packages into the data files
+
+    $(B -s)           Serve $(U dir) on localhost:$port and open /brewbar/docs
+
+    $(B -d) $(U dir)      Site directory $(I '(default: ~/Code/GitHub/amazebb)')
+
+$(B EXAMPLES)
+    Refresh the data, then serve it
+
+        brewinfo -r -s
+
+EOF
+}
+
+process() {
+    local out="$dir/brewbar/docs/data" missing count
+    [[ -f $categories ]] || warn "Missing $categories"
+    command -v brew >/dev/null || warn "brew not found"
+    mkdir -p "$out" || warn "Cannot create $out"
+
+    {
+        printf 'type\tname\tdesc\turl\tcat\n'
+        join -t $'\t' -a 2 -1 1 -2 2 -o 2.1,2.2,2.3,2.4,1.2 <(sort "$categories") <(sort -k2 <(
+            brew info --installed --json=v2 |
+                jq -r '(.formulae[] |
+                select(.installed[0].installed_on_request == true) |
+                "brew\t\(.name)\t\(.desc)\t\(.homepage)"),
+            (.casks[] | "cask\t\(.token)\t\(.name[0]): \(.desc // "")\t\(.homepage)")'
+        )) | sort -k1,2
+    } >"$out/packages.tsv"
+    info "Wrote $out/packages.tsv"
+
+    awk -F$'\t' 'BEGIN{print"["} NR>1{printf"%s{\"type\":\"%s\",\"name\":\"%s\",\"desc\":\"%s\",\"url\":\"%s\",\"cat\":\"%s\"}\n",(NR>2?",":""),$1,$2,$3,$4,$5} END{print"]"}' "$out/packages.tsv" >"$out/packages.json"
+    info "Wrote $out/packages.json"
+
+    missing=$(awk -F'\t' 'NR>1 && $5 == "" {print $2}' "$out/packages.tsv")
+    if [[ -n $missing ]]; then
+        count=$(printf '%s\n' "$missing" | wc -l | tr -d ' ')
+        info "$count package(s) missing categories:"
+        printf '%s\n' "$missing"
+    else
+        info "All packages have categories."
+    fi
+}
+
+serve() {
+    [[ -d $dir ]] || warn "Not a directory: $dir"
+    (sleep 1 && open "http://localhost:$port/brewbar/docs") &
+    python3 -m http.server "$port" --directory "$dir"
+}
+
+noargs $#
+
+while (($#)); do
+    case $1 in
+    -h)
+        usage
+        exit 0
+        ;;
+    -r) run=1 ;;
+    -s) serve=1 ;;
+    -d)
+        dir=$(argval "$@") || exit 1
+        shift
+        ;;
+    --) break ;;
+    -*) warn "Unknown option: $1" ;;
+    *) warn "Unknown argument: $1" ;;
+    esac
+    shift
+done
+
+((run)) && process
+((serve)) && serve
+exit 0

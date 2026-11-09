@@ -1,0 +1,166 @@
+bash	Shells & Terminal
+bat	Shells & Terminal
+btop	Shells & Terminal
+bun	Programming Languages & Runtimes
+coreutils	Shells & Terminal
+eza	Shells & Terminal
+fd	Shells & Terminal
+fzf	Shells & Terminal
+tmux	Shells & Terminal
+tree	Shells & Terminal
+zoxide	Shells & Terminal
+gh	Version Control
+git	Version Control
+git-filter-repo	Version Control
+git-lfs	Version Control
+git-svn	Version Control
+gitea	Version Control
+gitea-mcp-server	Version Control
+chapel	Programming Languages & Runtimes
+fennel	Programming Languages & Runtimes
+lua	Programming Languages & Runtimes
+node	Programming Languages & Runtimes
+perl	Programming Languages & Runtimes
+basedpyright	Language Servers & IDE Support
+bash-language-server	Language Servers & IDE Support
+fennel-ls	Language Servers & IDE Support
+gopls	Language Servers & IDE Support
+jdtls	Language Servers & IDE Support
+lua-language-server	Language Servers & IDE Support
+sql-language-server	Language Servers & IDE Support
+typescript-language-server	Language Servers & IDE Support
+vscode-langservers-extracted	Language Servers & IDE Support
+yaml-language-server	Language Servers & IDE Support
+cmake	Build Systems & Compilers
+cmake-docs	Build Systems & Compilers
+gradle	Build Systems & Compilers
+llvm	Build Systems & Compilers
+make	Build Systems & Compilers
+ninja	Build Systems & Compilers
+pkgconf	Build Systems & Compilers
+ruff	Code Quality & Linting
+shellcheck	Code Quality & Linting
+shfmt	Code Quality & Linting
+swiftlint	Code Quality & Linting
+chafa	Media Processing
+ffmpeg	Media Processing
+fluid-synth	Media Processing
+gmic	Media Processing
+graphicsmagick	Media Processing
+imagemagick	Media Processing
+libcaca	Media Processing
+libheif	Media Processing
+little-cms2	Media Processing
+mpv	Media Processing
+openjpeg	Media Processing
+portmidi	Media Processing
+sdl2	Media Processing
+sox	Media Processing
+yt-dlp	Media Processing
+djvulibre	Document & Text Processing
+epubcheck	Document & Text Processing
+pandoc	Document & Text Processing
+qpdf	Document & Text Processing
+texinfo	Document & Text Processing
+utftex	Document & Text Processing
+cjson	Data Processing & Analysis
+duckdb	Data Processing & Analysis
+jq	Data Processing & Analysis
+json-glib	Data Processing & Analysis
+qsv	Data Processing & Analysis
+tidy-viewer	Data Processing & Analysis
+visidata	Data Processing & Analysis
+xan	Data Processing & Analysis
+atool	File & Archive Tools
+cabextract	File & Archive Tools
+cdrtools	File & Archive Tools
+libdvdcss	File & Archive Tools
+librsync	File & Archive Tools
+p7zip	File & Archive Tools
+rsync	File & Archive Tools
+exiftool	Metadata & File Information
+exiv2	Metadata & File Information
+media-info	Metadata & File Information
+curl	Network Tools
+sniffnet	Network Tools
+wget	Network Tools
+gawk	Search & Text Processing
+gnu-sed	Search & Text Processing
+mawk	Search & Text Processing
+ripgrep	Search & Text Processing
+gperftools	System Utilities
+hyperfine	System Utilities
+mac-cleanup-go	System Utilities
+mactop	System Utilities
+parallel	System Utilities
+smartmontools	System Utilities
+tldr	System Utilities
+ipython	Python Tools
+pygments	Python Tools
+uv	Python Tools
+luarocks	Lua Ecosystem
+gettext	Development Libraries
+graphviz	Development Libraries
+gsl	Development Libraries
+libcerf	Development Libraries
+libomp	Development Libraries
+qt@5	Development Libraries
+tree-sitter-cli	Development Libraries
+rizin	Reverse Engineering
+arduino-cli	Hardware & Embedded
+iso-codes	Miscellaneous
+pastel	Miscellaneous
+audacity	Media Players & Editors
+blender	Media Players & Editors
+iina	Media Players & Editors
+makemkv	Media Players & Editors
+calibre	E-book & Media Management
+kid3	E-book & Media Management
+blackhole-16ch	Audio Utilities
+blackhole-2ch	Audio Utilities
+basictex	Development Tools
+dbeaver-community	Development Tools
+gitup-app	Development Tools
+jdk-mission-control	Development Tools
+kitty	Shells & Terminal
+appcleaner	System Utilities
+disk-inventory-x	System Utilities
+grandperspective	System Utilities
+keka	System Utilities
+stats	System Utilities
+suspicious-package	System Utilities
+qlmarkdown	Quick Look Plugins
+syntax-highlight	Quick Look Plugins
+font-fira-mono-nerd-font	Fonts
+font-symbols-only-nerd-font	Fonts
+font-lilex	Fonts
+font-lilex-nerd-font	Fonts
+utm	Virtualization
+bear	Build Systems & Compilers
+dosbox-x	Virtualization
+ghostscript	Document & Text Processing
+libraw	Development Libraries
+mupdf-tools	Document & Text Processing
+ncdu	System Utilities
+opencode	Development Tools
+poppler	Document & Text Processing
+tlrc	System Utilities
+android-platform-tools	Development Tools
+git-delta	Version Control
+jless	Data Processing & Analysis
+less	Shells & Terminal
+openssh	Network Tools
+pyrefly	Code Quality & Linting
+sdl2-compat	Media Processing
+typescript	Programming Languages & Runtimes
+viu	Media Processing
+xq	Data Processing & Analysis
+yazi	Shells & Terminal
+font-jetbrains-mono-nerd-font	Fonts
+ghostty@tip	Shells & Terminal
+kitty@nightly	Shells & Terminal
+temurin	Programming Languages & Runtimes
+temurin@21	Programming Languages & Runtimes
+xcodegen	Development Tools
+ghostty	Shells & Terminal
+markdown-preview	Quick Look Plugins

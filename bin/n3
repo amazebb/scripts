@@ -83,7 +83,7 @@ export NNN_FIFO
     mkfifo "$NNN_FIFO"
 )
 
-export NNN_PLUG='p:preview-tui'
+export NNN_PLUG='p:preview-tui;f:fzplug'
 
 # Default: nnn in this terminal; preview-tui uses Ghostty AppleScript
 # (or kitty/wezterm). -t / N3_TMUX=1 wraps nnn in tmux instead.

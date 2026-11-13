@@ -26,7 +26,7 @@ $(B DESCRIPTION)
     (on a status line if ffmpeg has no drawtext).
     Downloaded tiles are cached in ~/.cache/wx for 7 days.
 
-    In kitty or ghostty the gif is drawn directly in the terminal with $(B chafa)
+    In kitty, ghostty or rex the gif is drawn directly in the terminal with $(B chafa)
     ($(I Ctrl-C) to quit) or $(B kitten) if installed, otherwise it is played with mpv.
 
 $(B OPTIONS)
@@ -95,9 +95,9 @@ $(B EXAMPLES)
 EOF
 }
 
-# graphics_term: true when the terminal is kitty or ghostty
+# graphics_term: true when the terminal is kitty, ghostty or rex
 graphics_term() {
-    [[ $TERM == xterm-kitty || $TERM == xterm-ghostty || $TERM_PROGRAM == ghostty || -n $KITTY_WINDOW_ID ]]
+    [[ $TERM == xterm-kitty || $TERM == xterm-ghostty || $TERM_PROGRAM == ghostty || $TERM_PROGRAM == rex || -n $KITTY_WINDOW_ID ]]
 }
 
 # station_for LAT LON: nearest NWS radar station id
@@ -263,7 +263,18 @@ main() {
     if ((size)); then
         read -r rows cols < <(stty size 2>/dev/null)
         cols=${cols:-80} rows=${rows:-24}
-        rows=$((rows - fh - 2))
+        # forecast lines can wrap, so use the real cursor row when the terminal reports it
+        local pos=''
+        if ((fh)) && [[ -t 1 ]]; then
+            printf '\e[6n' >/dev/tty
+            IFS='[;' read -rs -t 1 -dR _ pos _ </dev/tty
+        fi
+        if [[ $pos == [0-9]* ]]; then
+            rows=$((rows - pos - 1))
+            fh=$((pos - 1))
+        else
+            rows=$((rows - fh - 2))
+        fi
         ((rows < 5)) && rows=5
         chafa_args=(--scale max --size "${cols}x$rows")
         icat_args=(--scale-up --place "${cols}x$rows@0x$((fh + 1))")

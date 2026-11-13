@@ -7,6 +7,7 @@ source "$(dirname "$0")/common.sh"
 source "$(dirname "$0")/wx/wxgeo.sh"
 
 BASE=https://radar.weather.gov/ridge/standard
+GIBS=https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi
 
 usage() {
     cat <<EOF
@@ -14,7 +15,7 @@ $(B NAME)
     $(B wxradar) - Show an animated weather radar loop around a US location
 
 $(B SYNOPSIS)
-    $(B "wxradar [-h] [-m] [-n] [-l] [-s] [-R] [-f [metric [metric2]]] [-r miles] [-F fps]") [$(U location)]
+    $(B "wxradar [-h] [-m] [-n] [-c | -C] [-l] [-s] [-R] [-f [metric [metric2]]] [-r miles] [-F fps]") [$(U location)]
 
 $(B DESCRIPTION)
     Builds a radar loop centred on $(U location) from RainViewer radar tiles over a
@@ -24,6 +25,8 @@ $(B DESCRIPTION)
     $(B -r) and $(B -F) are ignored. Only the RainViewer loop needs ffmpeg.
     Map data © OpenStreetMap contributors, radar by RainViewer.com; both are credited on the image
     (on a status line if ffmpeg has no drawtext).
+    With $(B -c) a satellite cloud layer (GOES infrared from NASA GIBS) is drawn under the
+    radar; with $(B -C) only the clouds are shown. GOES-West is used west of 105°W.
     Downloaded tiles are cached in ~/.cache/wx for 7 days.
 
     In kitty, ghostty or rex the gif is drawn directly in the terminal with $(B chafa)
@@ -35,6 +38,10 @@ $(B OPTIONS)
     $(B -m)           Play with mpv even when the terminal can show the gif itself
 
     $(B -n)           Play the NWS loop of the nearest radar station
+
+    $(B -c)           Add a satellite cloud layer under the radar
+
+    $(B -C)           Show the satellite clouds instead of the radar
 
     $(B -l)           Show only the latest radar image instead of the loop
 
@@ -80,6 +87,14 @@ $(B EXAMPLES)
 
         wxradar -R 60601
 
+    Radar over satellite clouds
+
+        wxradar -c
+
+    Satellite clouds only
+
+        wxradar -C 60601
+
     The forecast chart with humidity and wind gusts
 
         wxradar -f hum gust 60601
@@ -98,6 +113,16 @@ EOF
 # graphics_term: true when the terminal is kitty, ghostty or rex
 graphics_term() {
     [[ $TERM == xterm-kitty || $TERM == xterm-ghostty || $TERM_PROGRAM == ghostty || $TERM_PROGRAM == rex || -n $KITTY_WINDOW_ID ]]
+}
+
+# cursor_row: print the terminal's current cursor row, or nothing if it does not answer
+cursor_row() {
+    local row=''
+    if [[ -t 1 ]]; then
+        printf '\e[6n' >/dev/tty
+        IFS='[;' read -rs -t 1 -dR _ row _ </dev/tty
+    fi
+    [[ $row == [0-9]* ]] && echo "$row"
 }
 
 # station_for LAT LON: nearest NWS radar station id
@@ -132,11 +157,58 @@ queue_tile() {
     fi
 }
 
-# rainviewer LAT LON MILES LATEST OUT LABEL: write a radar loop gif centred on LAT LON, one frame if LATEST is 1
+# satellite DIR LAT LON MILES LATEST MODE [EPOCH...]: download GOES infrared frames of the radar view into
+# DIR/S_NN.png. MODE 1 gives one frame for each EPOCH (radar frame time), MODE 2 the latest 13 (as many as the radar loop), or 1 if LATEST.
+# Sets sat_times (caller's local) to the frame epochs.
+satellite() {
+    local d=$1 lat=$2 lon=$3 mi=$4 latest=$5 mode=$6 layer=GOES-East_ABI_Band13_Clean_Infrared caps def last bbox ts n f t
+    local -a want=() curl_args=()
+    local -A seen=()
+    shift 6
+    [[ ${lon%%.*} -lt -105 ]] && layer=GOES-West_ABI_Band13_Clean_Infrared
+    caps=$WXCACHE/gibs-$layer.xml
+    mkdir -p "$WXCACHE"
+    [[ -n $(find "$caps" -mmin -30 -print -quit 2>/dev/null) ]] ||
+        curl -fsSL -A "$UA" -o "$caps" "$GIBS?SERVICE=WMS&REQUEST=GetCapabilities" || warn "Could not reach NASA GIBS"
+    def=$(grep -A12 "<Name>$layer</Name>" "$caps" | sed -n 's/.*default="\([^"]*\)".*/\1/p' | head -1)
+    [[ -n $def ]] || warn "No satellite frames for $layer"
+    last=$(iso_epoch "${def%Z}+00:00")
+    if ((mode == 2)); then
+        n=13
+        ((latest)) && n=1
+        for ((f = n - 1; f >= 0; f--)); do want+=($((last - f * 600))); done
+    else
+        for t in "$@"; do
+            t=$((t / 600 * 600))
+            ((t > last)) && t=$last
+            want+=("$t")
+        done
+    fi
+    sat_times=("${want[@]}")
+    bbox=$(awk -v lat="$lat" -v lon="$lon" -v mi="$mi" 'BEGIN {
+        pi = atan2(0, -1); r = lat * pi / 180
+        x = lon * 20037508.342789244 / 180; y = log(sin(r) / cos(r) + 1 / cos(r)) * 6378137
+        h = mi * 1609.344 / cos(r)
+        printf "%.0f,%.0f,%.0f,%.0f", x - h, y - h, x + h, y + h }')
+    for t in "${want[@]}"; do
+        [[ -n ${seen[$t]-} ]] && continue
+        seen[$t]=1
+        ts=$(date -u -d "@$t" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$t" +%Y-%m-%dT%H:%M:%SZ)
+        curl_args+=(-o "$d/s_$t.png" "$GIBS?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=$layer&STYLES=&CRS=EPSG:3857&BBOX=$bbox&WIDTH=720&HEIGHT=720&FORMAT=image/png&TRANSPARENT=true&TIME=$ts")
+    done
+    curl -fsSL -A "$UA" --parallel --parallel-max 8 "${curl_args[@]}" || warn "Satellite download failed"
+    for f in "${!want[@]}"; do
+        [[ -s $d/s_${want[f]}.png ]] || warn "No satellite image for frame $f"
+        cp "$d/s_${want[f]}.png" "$d/S_$(printf %02d "$f").png"
+    done
+}
+
+# rainviewer LAT LON MILES LATEST OUT LABEL FPS CLOUDS: write a radar loop gif centred on LAT LON, one frame if LATEST is 1;
+# CLOUDS 1 adds a satellite cloud layer under the radar, 2 shows the clouds without radar
 rainviewer() {
-    local lat=$1 lon=$2 mi=$3 latest=$4 out=$5 label=$6 fps=$7 d z x0 y0 cols rows cx cy size host
-    local stamp labels="" t m mx0 my0 mcols mrows mcx mcy msize
-    local -a paths times curl_args fresh
+    local lat=$1 lon=$2 mi=$3 latest=$4 out=$5 label=$6 fps=$7 clouds=${8:-0} d z x0 y0 cols rows cx cy size host
+    local credit='RainViewer.com' credit_info='' stamp labels="" t m mx0 my0 mcols mrows mcx mcy msize
+    local -a paths=() times=() sat_times=() curl_args fresh
     local i j f k
     command -v ffmpeg &>/dev/null || warn "ffmpeg not found. Install with: $(I brew install ffmpeg)"
     d=$(dirname "$out")
@@ -144,6 +216,12 @@ rainviewer() {
     read -r z x0 y0 cols rows cx cy size m mx0 my0 mcols mrows mcx mcy msize < <(geometry "$lat" "$lon" "$mi")
 
     local json
+    if ((clouds == 2)); then
+        satellite "$d" "$lat" "$lon" "$mi" "$latest" 2
+        times=("${sat_times[@]}")
+        stamp=${times[-1]}
+        cols=0 rows=0
+    else
     json=$(curl -fsSL -A "$UA" https://api.rainviewer.com/public/weather-maps.json) || warn "Could not reach RainViewer"
     host=$(sed -n 's/.*"host": *"\([^"]*\)".*/\1/p' <<<"$json")
     mapfile -t paths < <(grep -o '"path": *"/v2/radar/[a-z0-9]*"' <<<"$json" | sed 's/.*"\(\/v2[^"]*\)"/\1/')
@@ -154,6 +232,8 @@ rainviewer() {
         times=("${times[-1]}")
     fi
     stamp=${times[-1]}
+    ((clouds)) && satellite "$d" "$lat" "$lon" "$mi" "$latest" 1 "${times[@]}"
+    fi
 
     for ((j = 0; j < rows; j++)); do
         for ((i = 0; i < cols; i++)); do
@@ -170,7 +250,7 @@ rainviewer() {
                 "$WXCACHE/osm/$m/$((mx0 + i))/$((my0 + j)).png"
         done
     done
-    info "$label ($lat,$lon), $mi mi, RainViewer, ${#paths[@]} frame(s) to $(stamp_fmt "$stamp")"
+    info "$label ($lat,$lon), $mi mi, $( ((clouds == 2)) && echo "GOES infrared" || echo RainViewer ), ${#times[@]} frame(s) to $(stamp_fmt "$stamp")"
     if ((${#curl_args[@]})); then
         curl -fsSL -A "$UA" --parallel --parallel-max 8 "${curl_args[@]}" || warn "Tile download failed"
     fi
@@ -178,8 +258,12 @@ rainviewer() {
         [[ -s ${fresh[i]} ]] && mkdir -p "$(dirname "${fresh[i + 1]}")" && cp "${fresh[i]}" "${fresh[i + 1]}"
     done
 
+    case $clouds in
+        1) credit='RainViewer.com · NASA GIBS, NOAA GOES' credit_info='radar by RainViewer.com, satellite by NASA GIBS and NOAA GOES' ;;
+        2) credit='NASA GIBS, NOAA GOES' credit_info='satellite by NASA GIBS and NOAA GOES' ;;
+    esac
     stitch "$d/b" "$mcols" "$mrows" "$d/base.png"
-    for f in "${!paths[@]}"; do
+    ((clouds == 2)) || for f in "${!paths[@]}"; do
         stitch "$d/r${f}" "$cols" "$rows" "$d/R_$(printf %02d "$f").png"
     done
     if ffmpeg -hide_banner -filters 2>/dev/null | grep -q drawtext; then
@@ -187,22 +271,38 @@ rainviewer() {
             t=$(stamp_fmt "${times[f]}")
             labels+="drawtext=font=monospace:text='${t//:/\\:}':x=8:y=8:fontsize=22:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6:enable='eq(n,$f)',"
         done
-        labels+="drawtext=font=monospace:text='© OpenStreetMap contributors · RainViewer.com':x=w-tw-8:y=h-th-8:fontsize=14:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=4,"
+        labels+="drawtext=font=monospace:text='© OpenStreetMap contributors · $credit':x=w-tw-8:y=h-th-8:fontsize=14:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=4,"
     else
-        info "© OpenStreetMap contributors, radar by RainViewer.com"
+        info "© OpenStreetMap contributors, ${credit_info:-radar by $credit}"
     fi
-    ffmpeg -nostdin -loglevel error -y -loop 1 -framerate "$fps" -i "$d/base.png" -framerate "$fps" -i "$d/R_%02d.png" \
-        -filter_complex "[0]crop=$msize:$msize:$mcx:$mcy,scale=720:720:flags=lanczos[bg];[1]crop=$size:$size:$cx:$cy,scale=720:720:flags=lanczos[fg];[bg][fg]overlay=shortest=1,${labels}drawbox=x=iw/2-14:y=ih/2-4:w=28:h=8:color=black:t=fill,drawbox=x=iw/2-4:y=ih/2-14:w=8:h=28:color=black:t=fill,drawbox=x=iw/2-12:y=ih/2-2:w=24:h=4:color=white:t=fill,drawbox=x=iw/2-2:y=ih/2-12:w=4:h=24:color=white:t=fill,split[a][b];[a]palettegen[p];[b][p]paletteuse" \
-        -f gif "$out"
+    local -a inputs=(-loop 1 -framerate "$fps" -i "$d/base.png") graph=()
+    local mark='drawbox=x=iw/2-14:y=ih/2-4:w=28:h=8:color=black:t=fill,drawbox=x=iw/2-4:y=ih/2-14:w=8:h=28:color=black:t=fill,drawbox=x=iw/2-12:y=ih/2-2:w=24:h=4:color=white:t=fill,drawbox=x=iw/2-2:y=ih/2-12:w=4:h=24:color=white:t=fill'
+    local top='[bg]' n=1
+    graph=("[0]crop=$msize:$msize:$mcx:$mcy,scale=720:720:flags=lanczos[bg]")
+    if ((clouds)); then
+        inputs+=(-framerate "$fps" -i "$d/S_%02d.png")
+        graph+=("[$n]split[s1][s2];[s1]format=gray,curves=all='0/0 0.5/0 0.8/0.8 1/0.9'[sa];[s2]format=rgba,lutrgb=r=255:g=255:b=255[sw];[sw][sa]alphamerge[cl];${top}[cl]overlay=shortest=1[bc]")
+        top='[bc]'
+        n=$((n + 1))
+    fi
+    if ((clouds != 2)); then
+        inputs+=(-framerate "$fps" -i "$d/R_%02d.png")
+        graph+=("[$n]crop=$size:$size:$cx:$cy,scale=720:720:flags=lanczos[fg];${top}[fg]overlay=shortest=1[br]")
+        top='[br]'
+    fi
+    ffmpeg -nostdin -loglevel error -y "${inputs[@]}" \
+        -filter_complex "$(IFS=';'; echo "${graph[*]};${top}${labels}${mark},split[a][b];[a]palettegen[p];[b][p]paletteuse")" -f gif "$out"
 }
 
 main() {
-    local mpv=0 nws=0 latest=0 size=0 fcast=1 fexplicit=0 fm=(temp amt) loc='' mi=50 fps=1
+    local mpv=0 nws=0 clouds=0 latest=0 size=0 fcast=1 fexplicit=0 fm=(temp amt) loc='' mi=50 fps=1
     while (($#)); do
         case $1 in
             -h) usage; exit 0 ;;
             -m) mpv=1 ;;
             -n) nws=1 ;;
+            -c) clouds=1 ;;
+            -C) clouds=2 ;;
             -l) latest=1 ;;
             -s) size=1 ;;
             -R) fcast=0 ;;
@@ -247,12 +347,13 @@ main() {
             name=$(station_for $ll)
         else
             # shellcheck disable=SC2086
-            rainviewer $ll "$mi" "$latest" "$gif" "${loc:-IP location}" "$fps"
+            rainviewer $ll "$mi" "$latest" "$gif" "${loc:-IP location}" "$fps" "$clouds"
         fi
     else
         name=$(tr "[:lower:]" "[:upper:]" <<<"$loc")
     fi
     if [[ -n $name ]]; then
+        ((clouds)) && warn "-c and -C do not apply to the NWS loop"
         info "${loc:-IP location} -> ${name}, NWS, $(stamp_fmt)"
         curl -fsSL -o "$gif" "$BASE/${name}_$( ((latest)) && echo 0 || echo loop).gif" || warn "No radar loop named $name"
     fi
@@ -265,11 +366,8 @@ main() {
         cols=${cols:-80} rows=${rows:-24}
         # forecast lines can wrap, so use the real cursor row when the terminal reports it
         local pos=''
-        if ((fh)) && [[ -t 1 ]]; then
-            printf '\e[6n' >/dev/tty
-            IFS='[;' read -rs -t 1 -dR _ pos _ </dev/tty
-        fi
-        if [[ $pos == [0-9]* ]]; then
+        ((fh)) && pos=$(cursor_row)
+        if [[ -n $pos ]]; then
             rows=$((rows - pos - 1))
             fh=$((pos - 1))
         else

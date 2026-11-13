@@ -6,6 +6,8 @@ source "$(dirname "$0")/lib.sh"
 radar_shims() {
   shim curl 'echo "$@" >>"$TMP/urls"
 case "$*" in
+  *GetCapabilities*) for a; do [ "$p" = -o ] && printf "<Name>GOES-East_ABI_Band13_Clean_Infrared</Name>\n<Dimension default=\"2026-11-13T17:10:00Z\"/>\n" >"$a"; p=$a; done ;;
+  *gibs.earthdata*) for a; do [ "$p" = -o ] && printf PNG >"$a"; p=$a; done ;;
   *weather-maps.json*) echo "{\"host\":\"https://tiles.test\",\"radar\":{\"past\":[{\"time\":1,\"path\":\"/v2/radar/abc\"},{\"time\":2,\"path\":\"/v2/radar/def\"}]}}" ;;
   *gridpoints*) printf "{\n\"startTime\": \"2026-10-30T13:00:00-04:00\",\n\"temperature\": 70,\n\"probabilityOfPrecipitation\": {\n\"value\": 40\n},\n\"windSpeed\": \"13 mph\",\n\"windDirection\": \"NW\",\n\"shortForecast\": \"Sunny\",\n}\n" ;;
   *api.weather.gov*) echo "\"radarStation\": \"KABC\", \"forecastHourly\": \"https://api.weather.gov/gridpoints/X/1,1/forecast/hourly\"" ;;
@@ -205,6 +207,26 @@ radar_extra_arg() {
   ! "$BIN/wxradar" a b >/dev/null 2>&1
 }
 
+# -c adds satellite frames under the radar, -C shows them alone
+radar_clouds() {
+  radar_shims
+  "$BIN/wxradar" -c -R 10001 >/dev/null 2>&1
+  grep -q 'LAYERS=GOES-East_ABI_Band13_Clean_Infrared.*BBOX=' "$TMP/urls" || return 1
+  grep -q 'tiles.test/v2/radar/abc' "$TMP/urls" || return 1
+  grep filter_complex "$TMP/ffargs" | grep -q 'S_%02d.png.*R_%02d.png' || return 1
+  radar_shims
+  rm -f "$TMP/ffargs"
+  "$BIN/wxradar" -C -R 10001 >/dev/null 2>&1
+  grep -q 'GetMap' "$TMP/urls" && ! grep -q 'tiles.test/v2/radar' "$TMP/urls" &&
+    ! grep filter_complex "$TMP/ffargs" | grep -q 'R_%02d.png'
+}
+
+# the NWS loop has no clouds
+radar_clouds_nws() {
+  radar_shims
+  ! "$BIN/wxradar" -c -n -R 10001 >/dev/null 2>&1
+}
+
 t "wxradar: zip resolves to tiles" radar_zip
 t "wxradar: lat,lon" radar_latlon
 t "wxradar: no argument uses ip location" radar_ip
@@ -225,6 +247,8 @@ t "wxradar: region name" radar_region
 t "wxradar: mpv fallback" radar_mpv_fallback
 t "wxradar: ghostty uses chafa" radar_chafa
 t "wxradar: ghostty falls back to kitten" radar_ghostty
+t "wxradar: -c and -C add satellite clouds" radar_clouds
+t "wxradar: -c rejects the NWS loop" radar_clouds_nws
 t "wxradar: rejects extra argument" radar_extra_arg
 
 exit $FAILED

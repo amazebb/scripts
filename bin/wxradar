@@ -28,6 +28,7 @@ $(B DESCRIPTION)
     With $(B -c) a satellite cloud layer (GOES infrared from NASA GIBS) is drawn under the
     radar; with $(B -C) only the clouds are shown. GOES-West is used west of 105°W.
     Downloaded tiles are cached in ~/.cache/wx for 7 days.
+    The last gif played is kept as ~/.cache/wx/radar.gif.
 
     In kitty, ghostty or rex the gif is drawn directly in the terminal with $(B chafa)
     ($(I Ctrl-C) to quit) or $(B kitten) if installed, otherwise it is played with mpv.
@@ -357,6 +358,8 @@ main() {
         info "${loc:-IP location} -> ${name}, NWS, $(stamp_fmt)"
         curl -fsSL -o "$gif" "$BASE/${name}_$( ((latest)) && echo 0 || echo loop).gif" || warn "No radar loop named $name"
     fi
+
+    mkdir -p "$WXCACHE" && cp "$gif" "$WXCACHE/radar.gif"
 
     local -a loop=(--loop) chafa_args=() icat_args=(--align left)
     ((latest)) && loop=()

@@ -45,13 +45,16 @@ command -v zoxide >/dev/null || warn "zoxide is not installed"
 
 query=("$@")
 if ((!${#query[@]})); then
-    read -r -p "z: " line
+    read -r -p "z $(I '(Enter: pick from list, or type a query)'): " line
+    # Erase the prompt line so repeated runs don't pile up in the scrollback
+    [[ -t 0 ]] && printf '\e[1A\r\e[2K' >&2
     # shellcheck disable=SC2206
     query=($line)
 fi
 
 if ((${#query[@]})); then
-    dir=$(zoxide query -- "${query[@]}") || warn "No match"
+    # zoxide already says "no match found"; wait so nnn doesn't hide it
+    dir=$(zoxide query -- "${query[@]}") || { read -r -s -p "Press Enter to continue" _; exit 1; }
 else
     dir=$(zoxide query -i --) || exit 0
 fi

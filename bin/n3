@@ -84,6 +84,7 @@ export NNN_FIFO
 )
 
 export NNN_PLUG='p:preview-tui;f:fzplug;z:bb-z'
+export NNN_TRASH=trash # x trashes via macOS /usr/bin/trash; X still deletes
 
 # Default: nnn in this terminal; preview-tui uses Ghostty AppleScript
 # (or kitty/wezterm). -t / N3_TMUX=1 wraps nnn in tmux instead.
@@ -93,6 +94,7 @@ if [[ $use_tmux -eq 1 && -z ${TMUX:-} ]]; then
         NNN_FIFO="$NNN_FIFO" \
         NNN_TMPFILE="$NNN_TMPFILE" \
         NNN_PLUG="$NNN_PLUG" \
+        NNN_TRASH="$NNN_TRASH" \
         nnn -dmIyGa "$@"
 else
     nnn -dmIyGa "$@"

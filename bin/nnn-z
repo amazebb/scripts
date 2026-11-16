@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Jump to a zoxide directory from inside nnn
+
+# shellcheck disable=SC2016
+source "$(dirname "$0")/common.sh"
+
+usage() {
+    cat <<EOF
+$(B NAME)
+    $(B nnn-z) - Jump to a zoxide directory from inside nnn
+
+$(B SYNOPSIS)
+    $(B "nnn-z [-h]") [$(U query)]
+
+$(B DESCRIPTION)
+    Meant to run as an nnn plugin (see plugins/bb-z in the nnn fork), which
+    provides $(B NNN_PIPE). Changes nnn to the best zoxide match for $(U query).
+    Without $(U query) it prompts: an empty reply opens the interactive picker
+    ($(B "zoxide query -i")), anything else is used as the query.
+
+$(B OPTIONS)
+    $(B -h)           Show this help message
+
+    [$(U query)]      Directory words to match $(I '(default: prompt)')
+
+$(B EXAMPLES)
+    Jump to the best match for "my path"
+
+        nnn-z my path
+EOF
+}
+
+while (($#)); do
+    case $1 in
+        -h | --help) usage; exit 0 ;;
+        --) shift; break ;;
+        -*) warn "Unknown option: $1" ;;
+        *) break ;;
+    esac
+    shift
+done
+
+[[ -p ${NNN_PIPE:-} ]] || warn "NNN_PIPE is not set: run this as an nnn plugin"
+command -v zoxide >/dev/null || warn "zoxide is not installed"
+
+query=("$@")
+if ((!${#query[@]})); then
+    read -r -p "z: " line
+    # shellcheck disable=SC2206
+    query=($line)
+fi
+
+if ((${#query[@]})); then
+    dir=$(zoxide query -- "${query[@]}") || warn "No match"
+else
+    dir=$(zoxide query -i --) || exit 0
+fi
+
+printf '0c%s' "$dir" >"$NNN_PIPE"

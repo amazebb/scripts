@@ -76,10 +76,14 @@ fi
 # To cd on quit only on ^G, remove the "export" and set NNN_TMPFILE *exactly* as this:
 export NNN_TMPFILE="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/.lastd"
 
-NNN_FIFO="$(mktemp -t nnn.XXXXXX -u)"
+# preview-tui derives its per-instance state files from the number after the first
+# dot, so the name must end in the shell pid (a random mktemp suffix would share them)
+NNN_FIFO="${TMPDIR:-/tmp}"
+NNN_FIFO="${NNN_FIFO%/}/nnn-fifo.$$"
 export NNN_FIFO
 (
     umask 077
+    rm -f "$NNN_FIFO"
     mkfifo "$NNN_FIFO"
 )
 
@@ -95,9 +99,9 @@ if [[ $use_tmux -eq 1 && -z ${TMUX:-} ]]; then
         NNN_TMPFILE="$NNN_TMPFILE" \
         NNN_PLUG="$NNN_PLUG" \
         NNN_TRASH="$NNN_TRASH" \
-        nnn -dmIyGa "$@"
+        nnn -dmIyG "$@"
 else
-    nnn -dmIyGa "$@"
+    nnn -dmIyG "$@"
 fi
 
 # Close leftover Ghostty preview splits. n3 is often sourced from zsh

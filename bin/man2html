@@ -3,7 +3,8 @@
 
 usage: man2html [-T TEMPLATE] [-t TITLE] [-o OUT] MANFILE
 
-  -T  page template; @TITLE@ and @MAN@ are replaced (default: a minimal built-in page)
+  -T  page template; @TITLE@ and @MAN@ are replaced and @include(file)@ pulls in a file next to
+      it (default: a minimal built-in page)
   -t  title (default: the file name as name(section), e.g. nnn.1 -> nnn(1))
   -o  output file (default: MANFILE with .html appended, e.g. nnn.1.html)
 
@@ -112,6 +113,9 @@ def main():
         sys.exit(f"man2html: {man} not found")
     name = a.title or (f"{man.stem}({man.suffix[1:]})" if man.suffix[1:] else man.stem)
     page = Path(a.template).read_text() if a.template else DEFAULT
+    if a.template:  # @include(file)@ pulls in a file next to the template
+        tdir = Path(a.template).parent
+        page = re.sub(r"@include\(([^)]+)\)@", lambda m: (tdir / m.group(1)).read_text().rstrip("\n"), page)
     frag = subprocess.run(
         ["mandoc", "-Thtml", "-O", "fragment", str(man)],
         check=True, capture_output=True, text=True,

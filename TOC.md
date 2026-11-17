@@ -2,6 +2,7 @@
 
 ## Table of Contents
 
+- [brewinfo](#brewinfo)
 - [build-nvim-nightly](#build-nvim-nightly)
 - [convertaudio](#convertaudio)
 - [data-backup](#data-backup)
@@ -25,6 +26,35 @@
 - [wxforecast](#wxforecast)
 - [wxnow](#wxnow)
 - [wxradar](#wxradar)
+
+## [brewinfo](https://github.com/amazebb/scripts/blob/master/bin/brewinfo)
+
+<pre>
+<b>NAME</b>
+    <b>brewinfo</b> - Build and serve the brewbar package list
+
+<b>SYNOPSIS</b>
+    <b>brewinfo [-h] [-r] [-s] [-d dir]</b>
+
+<b>DESCRIPTION</b>
+    Writes packages.tsv and packages.json to <u>dir</u>/brewbar/docs/data from the
+    installed Homebrew packages and homebrew/categories.txt, and serves the
+    site with the python web server.
+
+<b>OPTIONS</b>
+    <b>-h</b>           Show this help message
+
+    <b>-r</b>           Process the installed packages into the data files
+
+    <b>-s</b>           Serve <u>dir</u> on localhost:$port and open /brewbar/docs
+
+    <b>-d</b> <u>dir</u>      Site directory <i>(default: ~/Code/GitHub/amazebb)</i>
+
+<b>EXAMPLES</b>
+    Refresh the data, then serve it
+
+        brewinfo -r -s
+</pre>
 
 ## [build-nvim-nightly](https://github.com/amazebb/scripts/blob/master/bin/build-nvim-nightly)
 
@@ -1005,7 +1035,7 @@
     <b>wxradar</b> - Show an animated weather radar loop around a US location
 
 <b>SYNOPSIS</b>
-    <b>wxradar [-h] [-m] [-n] [-l] [-s] [-R] [-f [metric [metric2]]] [-r miles] [-F fps]</b> [<u>location</u>]
+    <b>wxradar [-h] [-m] [-n] [-c | -C] [-l] [-s] [-R] [-f [metric [metric2]]] [-r miles] [-F fps]</b> [<u>location</u>]
 
 <b>DESCRIPTION</b>
     Builds a radar loop centred on <u>location</u> from RainViewer radar tiles over a
@@ -1015,9 +1045,12 @@
     <b>-r</b> and <b>-F</b> are ignored. Only the RainViewer loop needs ffmpeg.
     Map data © OpenStreetMap contributors, radar by RainViewer.com; both are credited on the image
     (on a status line if ffmpeg has no drawtext).
+    With <b>-c</b> a satellite cloud layer (GOES infrared from NASA GIBS) is drawn under the
+    radar; with <b>-C</b> only the clouds are shown. GOES-West is used west of 105°W.
     Downloaded tiles are cached in ~/.cache/wx for 7 days.
+    The last gif played is kept as ~/.cache/wx/radar.gif.
 
-    In kitty or ghostty the gif is drawn directly in the terminal with <b>chafa</b>
+    In kitty, ghostty or rex the gif is drawn directly in the terminal with <b>chafa</b>
     (<i>Ctrl-C</i> to quit) or <b>kitten</b> if installed, otherwise it is played with mpv.
 
 <b>OPTIONS</b>
@@ -1026,6 +1059,10 @@
     <b>-m</b>           Play with mpv even when the terminal can show the gif itself
 
     <b>-n</b>           Play the NWS loop of the nearest radar station
+
+    <b>-c</b>           Add a satellite cloud layer under the radar
+
+    <b>-C</b>           Show the satellite clouds instead of the radar
 
     <b>-l</b>           Show only the latest radar image instead of the loop
 
@@ -1070,6 +1107,14 @@
     Radar only
 
         wxradar -R 60601
+
+    Radar over satellite clouds
+
+        wxradar -c
+
+    Satellite clouds only
+
+        wxradar -C 60601
 
     The forecast chart with humidity and wind gusts
 

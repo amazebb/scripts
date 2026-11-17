@@ -11,6 +11,8 @@ Each top-level section (.Sh) becomes <details class="man-sec"> and each
 subsection (.Ss) a nested <details class="man-sub">; NAME and SYNOPSIS start
 open. The markup inside comes from `mandoc -Thtml -O fragment` with the permalink
 anchors removed and bare URLs linked. Style it from the template's stylesheet.
+Sections get slug ids (#keybinds), environment variable paragraphs their name (#NNN_PILL) and
+flag paragraphs opt-<flag> (#opt-G), so pages can link to them.
 """
 import argparse
 import html
@@ -43,10 +45,14 @@ def title(h):
     return html.unescape(re.sub(r"<[^>]+>", "", h)).strip().title()
 
 
+def slug(name):
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+
 def details(cls, name, body, opened=False, subs=""):
     ind = "      " if cls == "man-sec" else "        "
     return (
-        f'{ind}<details class="{cls}"{" open" if opened else ""}>\n'
+        f'{ind}<details class="{cls}" id="{slug(name)}"{" open" if opened else ""}>\n'
         f'{ind}  <summary>{html.escape(name, quote=False)}</summary>\n'
         f'{ind}  <div class="man-body">{body.strip()}</div>\n{subs}\n'
         f"{ind}</details>\n"
@@ -72,6 +78,11 @@ def convert(frag):
     # no self-links: drop mandoc's permalink anchors and the ids they point at
     frag = re.sub(r'<a class="permalink"[^>]*>(.*?)</a>', r"\1", frag, flags=re.DOTALL)
     frag = re.sub(r'(<(?!h[12]\b)[a-z]+(?: [^>]*?)?) id="[^"]*"', r"\1", frag)
+    # anchors for deep links: an ENVIRONMENT_VARIABLE: paragraph gets its name, a -flag paragraph opt-flag
+    frag = re.sub(r'<p class="Pp">(<b>([A-Z][A-Z0-9_]*):</b>)', r'<p class="Pp" id="\2">\1', frag)
+    frag = re.sub(r'<p class="Pp">(<code class="Fl">-([A-Za-z0-9]+)</code>)', r'<p class="Pp" id="opt-\2">\1', frag)
+    # a single bold-italic letter (\\f(BIx) marks an underlined mnemonic key
+    frag = re.sub(r"<b><i>(.)</i></b>", r"<b><u>\1</u></b>", frag)
     frag = autolink(frag)
     out = ""
     for sh in frag.split('<section class="Sh">')[1:]:

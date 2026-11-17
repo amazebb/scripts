@@ -16,7 +16,8 @@ $(B DESCRIPTION)
     Meant to run as an nnn plugin (see plugins/bb-z in the nnn fork), which
     provides $(B NNN_PIPE). Changes nnn to the best zoxide match for $(U query).
     Without $(U query) it prompts: an empty reply opens the interactive picker
-    ($(B "zoxide query -i")), anything else is used as the query.
+    ($(B "zoxide query -i")), anything else is used as the query. The directory jumped to is recorded
+    with $(B "zoxide add").
 
 $(B OPTIONS)
     $(B -h)           Show this help message
@@ -59,4 +60,5 @@ else
     dir=$(zoxide query -i --) || exit 0
 fi
 
+[[ -d $dir ]] && zoxide add -- "$dir"
 printf '0c%s' "$dir" >"$NNN_PIPE"
